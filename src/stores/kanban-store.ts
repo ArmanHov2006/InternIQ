@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import type { Application } from "@/types/database";
 
 export type StatusId = "saved" | "applied" | "phone_screen" | "interview" | "offer" | "rejected";
 
@@ -26,8 +27,13 @@ interface ColumnData {
 interface KanbanState {
   columns: Record<StatusId, ColumnData>;
   cards: Record<string, KanbanCardData>;
+  isHydrated: boolean;
   search: string;
   filter: string | null;
+  restoreBoard: (columns: Record<StatusId, ColumnData>, cards: Record<string, KanbanCardData>) => void;
+  hydrateFromApplications: (applications: Application[]) => void;
+  addOrUpdateFromApplication: (application: Application) => void;
+  removeById: (id: string) => void;
   moveCard: (cardId: string, from: StatusId, to: StatusId, newIndex: number) => void;
   reorderCard: (cardId: string, column: StatusId, newIndex: number) => void;
   setSearch: (search: string) => void;
@@ -61,10 +67,96 @@ export const useKanbanStore = create<KanbanState>()(
     (set) => ({
       columns: columnsSeed,
       cards: cardsById,
+      isHydrated: false,
       search: "",
       filter: null,
+      restoreBoard: (columns, cards) => set({ columns, cards }),
       setSearch: (search) => set({ search }),
       setFilter: (filter) => set({ filter }),
+      hydrateFromApplications: (applications) =>
+        set(() => {
+          const cards: Record<string, KanbanCardData> = {};
+          const nextColumns: Record<StatusId, ColumnData> = {
+            ...columnsSeed,
+            saved: { ...columnsSeed.saved, cardIds: [] },
+            applied: { ...columnsSeed.applied, cardIds: [] },
+            phone_screen: { ...columnsSeed.phone_screen, cardIds: [] },
+            interview: { ...columnsSeed.interview, cardIds: [] },
+            offer: { ...columnsSeed.offer, cardIds: [] },
+            rejected: { ...columnsSeed.rejected, cardIds: [] },
+          };
+
+          for (const app of applications) {
+            cards[app.id] = {
+              id: app.id,
+              company: app.company,
+              role: app.role,
+              date: app.applied_date || "",
+              location: app.location || "Unknown",
+              tags: [],
+              notes: app.notes || "",
+              fitScore: app.fit_score ?? undefined,
+            };
+            nextColumns[app.status].cardIds.push(app.id);
+          }
+
+          return {
+            cards,
+            columns: nextColumns,
+            isHydrated: true,
+          };
+        }),
+      addOrUpdateFromApplication: (application) =>
+        set((state) => {
+          const currentStatus = (Object.keys(state.columns) as StatusId[]).find((status) =>
+            state.columns[status].cardIds.includes(application.id)
+          );
+          const targetStatus = application.status;
+          const nextColumns = { ...state.columns };
+
+          if (currentStatus && currentStatus !== targetStatus) {
+            nextColumns[currentStatus] = {
+              ...nextColumns[currentStatus],
+              cardIds: nextColumns[currentStatus].cardIds.filter((id) => id !== application.id),
+            };
+          }
+          if (!nextColumns[targetStatus].cardIds.includes(application.id)) {
+            nextColumns[targetStatus] = {
+              ...nextColumns[targetStatus],
+              cardIds: [application.id, ...nextColumns[targetStatus].cardIds],
+            };
+          }
+
+          return {
+            columns: nextColumns,
+            cards: {
+              ...state.cards,
+              [application.id]: {
+                id: application.id,
+                company: application.company,
+                role: application.role,
+                date: application.applied_date || "",
+                location: application.location || "Unknown",
+                tags: [],
+                notes: application.notes || "",
+                fitScore: application.fit_score ?? undefined,
+              },
+            },
+          };
+        }),
+      removeById: (id) =>
+        set((state) => {
+          const nextCards = { ...state.cards };
+          delete nextCards[id];
+          const nextColumns = { ...state.columns };
+          for (const status of Object.keys(nextColumns) as StatusId[]) {
+            nextColumns[status] = {
+              ...nextColumns[status],
+              cardIds: nextColumns[status].cardIds.filter((cardId) => cardId !== id),
+            };
+          }
+          return { cards: nextCards, columns: nextColumns };
+        }),
       moveCard: (cardId, from, to, newIndex) =>
         set((state) => {
           const source = state.columns[from];
@@ -87,6 +179,14 @@ export const useKanbanStore = create<KanbanState>()(
           return { columns: { ...state.columns, [column]: { ...state.columns[column], cardIds: current } } };
         }),
     }),
-    { name: "interniq-kanban-v2" }
+    {
+      name: "interniq-kanban-v2",
+      partialize: (state) => ({
+        columns: state.columns,
+        cards: state.cards,
+        search: state.search,
+        filter: state.filter,
+      }),
+    }
   )
 );

@@ -18,6 +18,7 @@ import {
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanCardFace } from "@/components/kanban/kanban-card";
 import { KanbanCardModal } from "@/components/kanban/kanban-card-modal";
@@ -27,7 +28,17 @@ import { useKanbanStore, type KanbanCardData, type StatusId } from "@/stores/kan
 const orderedStatuses: StatusId[] = ["saved", "applied", "phone_screen", "interview", "offer", "rejected"];
 
 export const KanbanBoard = () => {
-  const { columns, cards, moveCard, reorderCard, search, setSearch, filter, setFilter } = useKanbanStore();
+  const {
+    columns,
+    cards,
+    moveCard,
+    reorderCard,
+    restoreBoard,
+    search,
+    setSearch,
+    filter,
+    setFilter,
+  } = useKanbanStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<StatusId | null>(null);
   const [selected, setSelected] = useState<KanbanCardData | null>(null);
@@ -109,16 +120,43 @@ export const KanbanBoard = () => {
       ? destinationIds.length
       : Math.max(destinationIds.indexOf(overId), 0);
     const currentIndex = columns[from].cardIds.indexOf(cardId);
+    const previousColumns = JSON.parse(JSON.stringify(columns)) as typeof columns;
+    const previousCards = { ...cards };
 
     if (from === to) {
       if (newIndex === currentIndex || (newIndex === currentIndex + 1 && overId === cardId)) {
         return;
       }
       reorderCard(cardId, to, newIndex);
+      try {
+        const res = await fetch("/api/applications", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({ id: cardId, display_order: newIndex }),
+        });
+        if (!res.ok) throw new Error("Could not reorder card.");
+      } catch {
+        restoreBoard(previousColumns, previousCards);
+        toast.error("Could not reorder application. Reverted.");
+      }
       return;
     }
 
     moveCard(cardId, from, to, newIndex);
+    try {
+      const res = await fetch("/api/applications", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ id: cardId, status: to, display_order: newIndex }),
+      });
+      if (!res.ok) throw new Error("Could not update status.");
+    } catch {
+      restoreBoard(previousColumns, previousCards);
+      toast.error("Could not move application. Reverted.");
+      return;
+    }
 
     const confetti = (await import("canvas-confetti")).default;
     const element = document.querySelector(`[data-card-id="${cardId}"]`);
