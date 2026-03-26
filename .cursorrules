@@ -1,0 +1,34 @@
+# InternIQ - Cursor Rules
+
+## Project
+InternIQ: SaaS for CS students — public profile page + private AI-powered dashboard.
+Stack: Next.js 14 App Router + TypeScript + shadcn/ui + Tailwind | FastAPI | Supabase | Claude API
+
+## Code Style
+- TypeScript strict mode, no `any` types. Use `interface` for object shapes.
+- Named exports (except Next.js page/layout defaults). Arrow functions for components.
+- Early returns to reduce nesting. Destructure props. Template literals.
+- All strings in double quotes.
+
+## Next.js
+- App Router conventions: page.tsx, layout.tsx, route.ts, loading.tsx, error.tsx, not-found.tsx
+- Server components by default. Only add "use client" when using hooks or browser APIs.
+- API routes: export GET, POST, PUT, DELETE. Always check auth first. Use NextResponse.json().
+
+## Supabase
+- Browser client: import from src/lib/supabase/client.ts
+- Server client: import from src/lib/supabase/server.ts
+- Always check auth with supabase.auth.getUser() in API routes before DB operations.
+- Never expose the service_role key to the client.
+
+## Components
+- UI primitives from shadcn/ui (src/components/ui/)
+- Custom components in src/components/{feature}/
+- cn() from src/lib/utils.ts for conditional classNames
+- Every component that calls an API must have loading and error states
+- Use sonner toast for success/error notifications
+
+## Styling
+- Tailwind CSS only. No inline styles. No CSS modules.
+- Mobile-first: base styles for mobile, then sm:, md:, lg: breakpoints
+- Use shadcn design tokens (bg-background, text-foreground, border-border, etc.)

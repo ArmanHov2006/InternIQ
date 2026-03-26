@@ -1,0 +1,22 @@
+---
+description: Rules for AI feature components and FastAPI calls
+globs: ["src/components/ai/**/*.tsx", "src/app/dashboard/analyze/**/*.tsx", "src/app/dashboard/email/**/*.tsx"]
+---
+
+# AI Feature Patterns
+
+When calling FastAPI from the frontend:
+- Always include Authorization header with Supabase JWT
+- Get the token: const { data: { session } } = await supabase.auth.getSession()
+- Build URL: `${process.env.NEXT_PUBLIC_FASTAPI_URL}/api/analyze`
+- Always show a loading state (spinner + text like "Analyzing your resume...")
+- Handle Render free tier cold start (show "This may take 10-20 seconds on first request")
+- Display errors in a sonner toast
+- Cache results: save fit_score, fit_analysis, generated_email to the application record
+
+When displaying AI results:
+- Fit score: large circular progress, color-coded (red <40, yellow 40-69, green 70+)
+- Strengths: green checkmark icon per item
+- Gaps: red X icon per item
+- Suggestions: lightbulb icon per item
+- Cold emails: styled email container with "Copy to Clipboard" buttons for subject and body

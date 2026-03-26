@@ -1,0 +1,25 @@
+---
+description: Rules for Next.js App Router patterns
+globs: ["src/app/**/*.tsx", "src/app/**/*.ts"]
+---
+
+# Next.js App Router Patterns
+
+When creating pages:
+- Server components by default (no "use client")
+- Add "use client" only for interactivity (useState, useEffect, onClick, onChange)
+- Use loading.tsx for suspense boundaries
+- Use error.tsx for error boundaries
+
+When creating API routes (route.ts):
+- Export named functions: GET, POST, PUT, DELETE
+- Always validate auth first: const { data: { user } } = await supabase.auth.getUser()
+- Return NextResponse.json({ data }) for success
+- Return NextResponse.json({ error: message }, { status: code }) for errors
+- Parse body with request.json() for POST/PUT
+
+When creating layouts:
+- Dashboard layout checks auth and redirects to /login if not authenticated
+- Root layout wraps in ThemeProvider and includes Toaster from sonner
+- Use next/navigation for routing (useRouter, usePathname, redirect)
+- Set metadata using generateMetadata() for SEO on public pages

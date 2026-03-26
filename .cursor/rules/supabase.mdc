@@ -1,0 +1,15 @@
+---
+description: Rules for Supabase client usage
+globs: ["src/lib/supabase/**/*.ts", "src/app/api/**/*.ts", "src/hooks/**/*.ts"]
+---
+
+# Supabase Client Usage
+
+- In server components and API routes: use createServerClient from src/lib/supabase/server.ts
+- In client components: use createBrowserClient from src/lib/supabase/client.ts
+- Always use .select() to specify columns instead of select('*')
+- Chain .order() for consistent ordering
+- Use .single() when expecting exactly one row
+- Handle errors: const { data, error } = await supabase.from(...); if (error) throw error;
+- For file uploads: supabase.storage.from('bucket').upload(path, file, { upsert: true })
+- For public URLs: supabase.storage.from('bucket').getPublicUrl(path)
