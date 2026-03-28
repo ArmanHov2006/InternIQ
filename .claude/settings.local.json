@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx shadcn@latest init -y --defaults)"
+      "Bash(npx shadcn@latest init -y --defaults)",
+      "Bash(npx shadcn@latest add card input label textarea dialog select badge tabs avatar dropdown-menu separator sheet sonner -y)",
+      "Bash(npx next:*)",
+      "Bash(rm -rf src/components/ui)",
+      "Bash(rm -f components.json src/lib/utils.ts)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

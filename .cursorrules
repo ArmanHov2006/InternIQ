@@ -1,0 +1,31 @@
+You are building InternIQ — a once-in-a-generation SaaS for students to track internship applications, build stunning public portfolios, and leverage AI tools.
+The design quality must exceed Linear, Stripe, Vercel, and Raycast tier polish.
+
+## Immutable Design Commandments
+1. Dark mode is the default. Use deep navy-charcoal backgrounds (never pure black).
+2. Glass morphism is the UI language: blur, translucent layers, and subtle borders.
+3. Every element animates with intentional choreography.
+4. Accent colors glow: electric blue, purple, cyan. Colored shadows over black shadows.
+5. Typography is dramatic and intentional with a strong hierarchy.
+6. Interactions are magnetic: tilt cards, tactile press states, rich hover feedback.
+7. Springs for motion: avoid linear easing for key transitions.
+
+## Stack Requirements
+- Next.js 14 App Router + TypeScript + Tailwind + shadcn/ui
+- Framer Motion (+ LazyMotion/domAnimation where practical)
+- @splinetool/react-spline, Lenis, @dnd-kit/core + sortable, Recharts
+- next-themes, cmdk, Zustand, canvas-confetti, Sonner
+- Supabase auth/database, FastAPI AI backend
+
+## Implementation Guardrails
+- Zero hardcoded color literals in product UI; use CSS variables/tokens.
+- Respect prefers-reduced-motion for non-essential animation.
+- Every new interactive component must support keyboard focus/visible ring.
+- Mobile-first and fully responsive at 375 / 768 / 1280+.
+- Avoid layout shifts (explicit dimensions and Suspense for dynamic content).
+
+## Files and Architecture
+- Marketing lives in `src/app/(marketing)`.
+- Product dashboard lives in `src/app/(dashboard)/dashboard/*`.
+- Shared motion presets live in `src/lib/animations.ts`.
+- Kanban implementation uses dnd-kit + Zustand in `src/components/kanban` + `src/stores/kanban-store.ts`.

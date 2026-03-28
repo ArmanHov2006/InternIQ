@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -10,12 +11,16 @@ import { Button } from "@/components/ui/button";
 import {
   AnalyzerGlyph,
   BrandMarkIcon,
+  InterviewGlyph,
   IconFrame,
+  LetterGlyph,
   MailGlyph,
   MoonGlyph,
   OverviewGlyph,
   ProfileGlyph,
+  SparkGlyph,
   SunGlyph,
+  TailorGlyph,
   TrackerGlyph,
 } from "@/components/ui/icons/premium-icons";
 
@@ -30,6 +35,10 @@ export const dashboardNavItems = [
   { href: "/dashboard/profile", label: "Profile", icon: ProfileGlyph },
   { href: "/dashboard/analyze", label: "AI Analyzer", icon: AnalyzerGlyph },
   { href: "/dashboard/email", label: "Cold Email", icon: MailGlyph },
+  { href: "/dashboard/automation", label: "Automation", icon: SparkGlyph },
+  { href: "/dashboard/interview-prep", label: "Interview Prep", icon: InterviewGlyph },
+  { href: "/dashboard/cover-letter", label: "Cover Letter", icon: LetterGlyph },
+  { href: "/dashboard/resume-tailor", label: "Resume Tailor", icon: TailorGlyph },
 ];
 
 export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
@@ -51,7 +60,7 @@ export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
           {!collapsed ? <span className="font-display text-xl">InternIQ</span> : null}
         </Link>
 
-        <nav className="space-y-1">
+        <nav className="space-y-1 overflow-y-auto pr-1">
           {dashboardNavItems.map((item) => {
             const active = pathname === item.href;
             return (
@@ -73,22 +82,35 @@ export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
         <div className="mt-auto space-y-2">
           <Button
             variant="ghost"
-            className="w-full justify-start"
+            className={cn("w-full", collapsed ? "justify-center px-2" : "justify-start")}
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            aria-label="Toggle theme"
           >
             {mounted && theme === "dark" ? (
-              <IconFrame className="mr-2 h-6 w-6 rounded-md">
+              <IconFrame className={cn("h-6 w-6 rounded-md", collapsed ? "" : "mr-2")}>
                 <SunGlyph />
               </IconFrame>
             ) : (
-              <IconFrame className="mr-2 h-6 w-6 rounded-md">
+              <IconFrame className={cn("h-6 w-6 rounded-md", collapsed ? "" : "mr-2")}>
                 <MoonGlyph />
               </IconFrame>
             )}
             {!collapsed ? "Theme" : null}
           </Button>
-          <Button variant="ghost" className="w-full justify-start" onClick={onToggleCollapse}>
-            {!collapsed ? "Collapse" : "Expand"}
+          <Button
+            variant="ghost"
+            className={cn("w-full", collapsed ? "justify-center px-2" : "justify-start")}
+            onClick={onToggleCollapse}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <span className={cn("inline-flex items-center", collapsed ? "" : "mr-2")}>
+              {collapsed ? (
+                <PanelLeftOpen className="h-4 w-4" />
+              ) : (
+                <PanelLeftClose className="h-4 w-4" />
+              )}
+            </span>
+            {!collapsed ? "Collapse" : null}
           </Button>
         </div>
       </div>

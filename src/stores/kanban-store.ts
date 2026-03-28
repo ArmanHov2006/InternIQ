@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { Application } from "@/types/database";
 
-export type StatusId = "saved" | "applied" | "phone_screen" | "interview" | "offer" | "rejected";
+export type StatusId = "saved" | "applied" | "interview" | "offer" | "rejected";
 
 export interface KanbanCardData {
   id: string;
@@ -15,6 +15,10 @@ export interface KanbanCardData {
   tags: string[];
   notes?: string;
   fitScore?: number;
+  status?: StatusId;
+  lastStatusChangeSource?: "manual" | "gmail_auto" | "gmail_confirmed" | "system";
+  lastStatusChangeReason?: string;
+  lastStatusChangeAt?: string;
 }
 
 interface ColumnData {
@@ -38,27 +42,24 @@ interface KanbanState {
   reorderCard: (cardId: string, column: StatusId, newIndex: number) => void;
   setSearch: (search: string) => void;
   setFilter: (filter: string | null) => void;
+  setCardNotes: (id: string, notes: string) => void;
 }
 
-const seedCards: KanbanCardData[] = [
-  { id: "1", company: "Google", role: "SWE Intern", date: "Mar 18", location: "Remote", tags: ["backend"], fitScore: 91 },
-  { id: "2", company: "Meta", role: "PM Intern", date: "Mar 15", location: "Menlo Park", tags: ["product"], fitScore: 78 },
-  { id: "3", company: "Apple", role: "Design Intern", date: "Mar 12", location: "Cupertino", tags: ["design"], fitScore: 82 },
-  { id: "4", company: "Stripe", role: "Data Intern", date: "Mar 10", location: "SF", tags: ["data"], fitScore: 74 },
-  { id: "5", company: "Vercel", role: "Frontend Intern", date: "Mar 8", location: "Remote", tags: ["frontend"], fitScore: 88 },
-  { id: "6", company: "Notion", role: "Product Intern", date: "Mar 7", location: "Remote", tags: ["product"], fitScore: 80 },
-  { id: "7", company: "Datadog", role: "Infra Intern", date: "Mar 5", location: "NYC", tags: ["infra"], fitScore: 73 },
-  { id: "8", company: "HubSpot", role: "Growth Intern", date: "Mar 4", location: "Boston", tags: ["growth"], fitScore: 76 },
-];
-
-const cardsById = Object.fromEntries(seedCards.map((card) => [card.id, card])) as Record<string, KanbanCardData>;
+const STATUS_IDS: StatusId[] = ["saved", "applied", "interview", "offer", "rejected"];
+const isStatusId = (value: unknown): value is StatusId =>
+  typeof value === "string" && STATUS_IDS.includes(value as StatusId);
+const toSafeStatus = (value: unknown): StatusId => {
+  if (value === "phone_screen" || value === "phone-screen" || value === "phone screen") {
+    return "interview";
+  }
+  return isStatusId(value) ? value : "saved";
+};
 
 const columnsSeed: Record<StatusId, ColumnData> = {
-  saved: { id: "saved", title: "Saved", color: "oklch(0.65 0.25 265)", cardIds: ["1", "2"] },
-  applied: { id: "applied", title: "Applied", color: "oklch(0.58 0.19 280)", cardIds: ["3", "4"] },
-  phone_screen: { id: "phone_screen", title: "Phone Screen", color: "oklch(0.82 0.18 95)", cardIds: ["5"] },
-  interview: { id: "interview", title: "Interview", color: "oklch(0.7 0.2 300)", cardIds: ["6", "7"] },
-  offer: { id: "offer", title: "Offer", color: "oklch(0.78 0.2 145)", cardIds: ["8"] },
+  saved: { id: "saved", title: "Saved", color: "oklch(0.65 0.25 265)", cardIds: [] },
+  applied: { id: "applied", title: "Applied", color: "oklch(0.58 0.19 280)", cardIds: [] },
+  interview: { id: "interview", title: "Interview", color: "oklch(0.7 0.2 300)", cardIds: [] },
+  offer: { id: "offer", title: "Offer", color: "oklch(0.78 0.2 145)", cardIds: [] },
   rejected: { id: "rejected", title: "Rejected", color: "oklch(0.66 0.23 30)", cardIds: [] },
 };
 
@@ -66,13 +67,27 @@ export const useKanbanStore = create<KanbanState>()(
   persist(
     (set) => ({
       columns: columnsSeed,
-      cards: cardsById,
+      cards: {},
       isHydrated: false,
       search: "",
       filter: null,
       restoreBoard: (columns, cards) => set({ columns, cards }),
       setSearch: (search) => set({ search }),
       setFilter: (filter) => set({ filter }),
+      setCardNotes: (id, notes) =>
+        set((state) => {
+          const existing = state.cards[id];
+          if (!existing) return state;
+          return {
+            cards: {
+              ...state.cards,
+              [id]: {
+                ...existing,
+                notes,
+              },
+            },
+          };
+        }),
       hydrateFromApplications: (applications) =>
         set(() => {
           const cards: Record<string, KanbanCardData> = {};
@@ -80,7 +95,6 @@ export const useKanbanStore = create<KanbanState>()(
             ...columnsSeed,
             saved: { ...columnsSeed.saved, cardIds: [] },
             applied: { ...columnsSeed.applied, cardIds: [] },
-            phone_screen: { ...columnsSeed.phone_screen, cardIds: [] },
             interview: { ...columnsSeed.interview, cardIds: [] },
             offer: { ...columnsSeed.offer, cardIds: [] },
             rejected: { ...columnsSeed.rejected, cardIds: [] },
@@ -96,8 +110,13 @@ export const useKanbanStore = create<KanbanState>()(
               tags: [],
               notes: app.notes || "",
               fitScore: app.fit_score ?? undefined,
+              status: toSafeStatus(app.status),
+              lastStatusChangeSource: app.last_status_change_source ?? "manual",
+              lastStatusChangeReason: app.last_status_change_reason ?? "",
+              lastStatusChangeAt: app.last_status_change_at ?? app.updated_at,
             };
-            nextColumns[app.status].cardIds.push(app.id);
+            const status = toSafeStatus(app.status);
+            nextColumns[status].cardIds.push(app.id);
           }
 
           return {
@@ -111,7 +130,7 @@ export const useKanbanStore = create<KanbanState>()(
           const currentStatus = (Object.keys(state.columns) as StatusId[]).find((status) =>
             state.columns[status].cardIds.includes(application.id)
           );
-          const targetStatus = application.status;
+          const targetStatus = toSafeStatus(application.status);
           const nextColumns = { ...state.columns };
 
           if (currentStatus && currentStatus !== targetStatus) {
@@ -140,6 +159,10 @@ export const useKanbanStore = create<KanbanState>()(
                 tags: [],
                 notes: application.notes || "",
                 fitScore: application.fit_score ?? undefined,
+                status: targetStatus,
+                lastStatusChangeSource: application.last_status_change_source ?? "manual",
+                lastStatusChangeReason: application.last_status_change_reason ?? "",
+                lastStatusChangeAt: application.last_status_change_at ?? application.updated_at,
               },
             },
           };
@@ -181,11 +204,44 @@ export const useKanbanStore = create<KanbanState>()(
     }),
     {
       name: "interniq-kanban-v2",
+      version: 3,
+      migrate: (persistedState) => {
+        const state = (persistedState ?? {}) as Partial<KanbanState>;
+        const legacyColumns = (state.columns as Record<string, ColumnData> | undefined) ?? {};
+        const legacyPhoneScreenIds = Array.isArray(legacyColumns.phone_screen?.cardIds)
+          ? legacyColumns.phone_screen.cardIds.filter((id): id is string => typeof id === "string")
+          : [];
+        const safeColumns: Record<StatusId, ColumnData> = {
+          saved: { ...columnsSeed.saved, cardIds: [] },
+          applied: { ...columnsSeed.applied, cardIds: [] },
+          interview: { ...columnsSeed.interview, cardIds: [] },
+          offer: { ...columnsSeed.offer, cardIds: [] },
+          rejected: { ...columnsSeed.rejected, cardIds: [] },
+        };
+
+        const safeCards = state.cards && typeof state.cards === "object" ? state.cards : {};
+
+        for (const status of STATUS_IDS) {
+          const sourceIds = state.columns?.[status]?.cardIds;
+          if (!Array.isArray(sourceIds)) continue;
+          safeColumns[status].cardIds = sourceIds.filter((id): id is string => typeof id === "string");
+        }
+        if (legacyPhoneScreenIds.length > 0) {
+          safeColumns.interview.cardIds = [
+            ...safeColumns.interview.cardIds,
+            ...legacyPhoneScreenIds.filter((id) => !safeColumns.interview.cardIds.includes(id)),
+          ];
+        }
+
+        return {
+          ...state,
+          columns: safeColumns,
+          cards: safeCards,
+        } as KanbanState;
+      },
       partialize: (state) => ({
         columns: state.columns,
         cards: state.cards,
-        search: state.search,
-        filter: state.filter,
       }),
     }
   )

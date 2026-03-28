@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
 import type { Application } from "@/types/database";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatCardSkeleton } from "@/components/dashboard/stat-card-skeleton";
@@ -9,12 +10,12 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { MagneticButton } from "@/components/ui/magnetic-button";
 import { IconFrame, PlusGlyph, SearchGlyph, WandGlyph } from "@/components/ui/icons/premium-icons";
 import { EmptyState } from "@/components/ui/empty-state";
+import { dispatchOpenAddApplication } from "@/lib/events";
 
 const sparkline = [{ value: 2 }, { value: 4 }, { value: 5 }, { value: 8 }, { value: 9 }, { value: 12 }];
 const pipelineStatuses: Application["status"][] = [
   "saved",
   "applied",
-  "phone_screen",
   "interview",
   "offer",
   "rejected",
@@ -22,13 +23,13 @@ const pipelineStatuses: Application["status"][] = [
 const pipelineColors: Record<Application["status"], string> = {
   saved: "bg-blue-500/70",
   applied: "bg-indigo-500/70",
-  phone_screen: "bg-yellow-400/70",
   interview: "bg-purple-500/70",
   offer: "bg-emerald-500/70",
   rejected: "bg-rose-500/70",
 };
 
 export default function DashboardPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState<Application[]>([]);
 
@@ -57,7 +58,7 @@ export default function DashboardPage() {
       },
       {} as Record<Application["status"], number>
     );
-    const activeInterviews = byStatus.interview + byStatus.phone_screen;
+    const activeInterviews = byStatus.interview;
     const offers = byStatus.offer;
     const responded = total - byStatus.saved;
     const responseRate = total === 0 ? 0 : Math.round((responded / total) * 100);
@@ -79,25 +80,38 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4 lg:grid-cols-4">
           <StatCard label="Total Applications" value={metrics.total} trend="Across all stages" data={sparkline} />
-          <StatCard label="Active Interviews" value={metrics.activeInterviews} trend="Phone + onsite rounds" data={sparkline} />
+          <StatCard label="Active Interviews" value={metrics.activeInterviews} trend="Interview rounds in progress" data={sparkline} />
           <StatCard label="Response Rate" value={metrics.responseRate} suffix="%" trend="Moved beyond saved stage" data={sparkline} />
           <StatCard label="Offers" value={metrics.offers} trend={metrics.offers > 0 ? "Momentum building" : "No offers yet"} data={sparkline} />
         </div>
       )}
       <div className="flex flex-wrap gap-3">
-        <MagneticButton className="gap-2">
+        <MagneticButton
+          className="gap-2"
+          onClick={() => {
+            dispatchOpenAddApplication();
+          }}
+        >
           <IconFrame className="h-6 w-6 rounded-md border-white/10 bg-white/[0.03]">
             <PlusGlyph />
           </IconFrame>
           Add Application
         </MagneticButton>
-        <MagneticButton variant="outline" className="gap-2">
+        <MagneticButton
+          variant="outline"
+          className="gap-2"
+          onClick={() => router.push("/dashboard/profile")}
+        >
           <IconFrame className="h-6 w-6 rounded-md border-white/10 bg-white/[0.03]">
             <SearchGlyph />
           </IconFrame>
           Upload Resume
         </MagneticButton>
-        <MagneticButton variant="outline" className="gap-2">
+        <MagneticButton
+          variant="outline"
+          className="gap-2"
+          onClick={() => router.push("/dashboard/email")}
+        >
           <IconFrame className="h-6 w-6 rounded-md border-white/10 bg-white/[0.03]">
             <WandGlyph />
           </IconFrame>
@@ -110,7 +124,12 @@ export default function DashboardPage() {
           title="No dashboard data yet"
           description="Add your first application to unlock real-time analytics and activity history."
           action={
-            <MagneticButton className="gap-2">
+            <MagneticButton
+              className="gap-2"
+              onClick={() => {
+                dispatchOpenAddApplication();
+              }}
+            >
               <Plus className="h-4 w-4" />
               Add Application
             </MagneticButton>

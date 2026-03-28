@@ -3,10 +3,11 @@
 import {
   type CollisionDetection,
   closestCorners,
+  defaultDropAnimationSideEffects,
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
   TouchSensor,
   pointerWithin,
   useSensor,
@@ -16,7 +17,7 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { KanbanColumn } from "@/components/kanban/kanban-column";
@@ -24,8 +25,9 @@ import { KanbanCardFace } from "@/components/kanban/kanban-card";
 import { KanbanCardModal } from "@/components/kanban/kanban-card-modal";
 import { KanbanFilters } from "@/components/kanban/kanban-filters";
 import { useKanbanStore, type KanbanCardData, type StatusId } from "@/stores/kanban-store";
+import type { Application } from "@/types/database";
 
-const orderedStatuses: StatusId[] = ["saved", "applied", "phone_screen", "interview", "offer", "rejected"];
+const orderedStatuses: StatusId[] = ["saved", "applied", "interview", "offer", "rejected"];
 
 export const KanbanBoard = () => {
   const {
@@ -33,6 +35,8 @@ export const KanbanBoard = () => {
     cards,
     moveCard,
     reorderCard,
+    removeById,
+    addOrUpdateFromApplication,
     restoreBoard,
     search,
     setSearch,
@@ -43,16 +47,39 @@ export const KanbanBoard = () => {
   const [overColumn, setOverColumn] = useState<StatusId | null>(null);
   const [selected, setSelected] = useState<KanbanCardData | null>(null);
   const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null);
+  const [liveMessage, setLiveMessage] = useState("");
+  const updateRequestControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } })
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } })
   );
+
+  const parseApiError = async (response: Response, fallback: string): Promise<string> => {
+    try {
+      const payload = (await response.json()) as { error?: string; detail?: string };
+      return payload.error || payload.detail || fallback;
+    } catch {
+      return fallback;
+    }
+  };
 
   const collisionDetection: CollisionDetection = (args) => {
     const pointerCollisions = pointerWithin(args);
-    if (pointerCollisions.length > 0) return pointerCollisions;
+    if (pointerCollisions.length > 0) {
+      const cardCollision = pointerCollisions.find(
+        (collision) => !orderedStatuses.includes(String(collision.id) as StatusId)
+      );
+      if (cardCollision) return [cardCollision];
+
+      const columnCollision = pointerCollisions.find((collision) =>
+        orderedStatuses.includes(String(collision.id) as StatusId)
+      );
+      if (columnCollision) return [columnCollision];
+
+      return pointerCollisions;
+    }
     return closestCorners(args);
   };
 
@@ -79,6 +106,7 @@ export const KanbanBoard = () => {
 
   const onDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
+    setLiveMessage("Picked up card.");
     const initialRect = event.active.rect.current.initial;
     if (initialRect) {
       setDragSize({ width: initialRect.width, height: initialRect.height });
@@ -89,6 +117,7 @@ export const KanbanBoard = () => {
     setActiveId(null);
     setOverColumn(null);
     setDragSize(null);
+    setLiveMessage("Drag cancelled.");
   };
 
   const onDragOver = (event: DragOverEvent) => {
@@ -115,13 +144,50 @@ export const KanbanBoard = () => {
     const overId = String(over.id);
     const to = orderedStatuses.includes(overId as StatusId) ? (overId as StatusId) : findStatus(overId);
     if (!from || !to) return;
-    const destinationIds = columns[to].cardIds;
-    const newIndex = orderedStatuses.includes(overId as StatusId)
-      ? destinationIds.length
-      : Math.max(destinationIds.indexOf(overId), 0);
+    const destinationIds = columns[to].cardIds.filter((id) => id !== cardId);
+    const overIndex = destinationIds.indexOf(overId);
+    const translated = active.rect.current.translated;
+    const overRect = over.rect;
+    const isOverColumn = orderedStatuses.includes(overId as StatusId);
+    let newIndex = destinationIds.length;
+
+    if (!isOverColumn && overIndex >= 0) {
+      const isBelowOverItem =
+        translated && overRect
+          ? translated.top + translated.height / 2 > overRect.top + overRect.height / 2
+          : false;
+      newIndex = overIndex + (isBelowOverItem ? 1 : 0);
+    }
     const currentIndex = columns[from].cardIds.indexOf(cardId);
     const previousColumns = JSON.parse(JSON.stringify(columns)) as typeof columns;
     const previousCards = { ...cards };
+
+    const cardElement = document.querySelector(`[data-card-id="${cardId}"]`);
+    const cardRect = cardElement?.getBoundingClientRect();
+
+    const persistUpdate = async (
+      payload: Record<string, unknown>,
+      fallbackErrorMessage: string,
+      requestCardId: string
+    ) => {
+      updateRequestControllersRef.current.get(requestCardId)?.abort();
+      const controller = new AbortController();
+      updateRequestControllersRef.current.set(requestCardId, controller);
+      try {
+        const res = await fetch("/api/applications", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify(payload),
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(await parseApiError(res, fallbackErrorMessage));
+      } finally {
+        if (updateRequestControllersRef.current.get(requestCardId) === controller) {
+          updateRequestControllersRef.current.delete(requestCardId);
+        }
+      }
+    };
 
     if (from === to) {
       if (newIndex === currentIndex || (newIndex === currentIndex + 1 && overId === cardId)) {
@@ -129,52 +195,123 @@ export const KanbanBoard = () => {
       }
       reorderCard(cardId, to, newIndex);
       try {
-        const res = await fetch("/api/applications", {
-          method: "PUT",
-          headers: { "Content-Type": "application/json", Accept: "application/json" },
-          credentials: "same-origin",
-          body: JSON.stringify({ id: cardId, display_order: newIndex }),
-        });
-        if (!res.ok) throw new Error("Could not reorder card.");
-      } catch {
+        await persistUpdate({ id: cardId, display_order: newIndex }, "Could not reorder card.", cardId);
+        setLiveMessage(`Reordered card in ${columns[to].title}.`);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
         restoreBoard(previousColumns, previousCards);
-        toast.error("Could not reorder application. Reverted.");
+        toast.error(
+          error instanceof Error ? `${error.message} Reverted.` : "Could not reorder application. Reverted."
+        );
       }
       return;
     }
 
     moveCard(cardId, from, to, newIndex);
     try {
-      const res = await fetch("/api/applications", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json", Accept: "application/json" },
-        credentials: "same-origin",
-        body: JSON.stringify({ id: cardId, status: to, display_order: newIndex }),
-      });
-      if (!res.ok) throw new Error("Could not update status.");
-    } catch {
+      await persistUpdate(
+        { id: cardId, status: to, display_order: newIndex },
+        "Could not update status.",
+        cardId
+      );
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") return;
       restoreBoard(previousColumns, previousCards);
-      toast.error("Could not move application. Reverted.");
+      toast.error(
+        error instanceof Error ? `${error.message} Reverted.` : "Could not move application. Reverted."
+      );
       return;
     }
 
     const confetti = (await import("canvas-confetti")).default;
-    const element = document.querySelector(`[data-card-id="${cardId}"]`);
-    const rect = element?.getBoundingClientRect();
-    if (rect) {
+    if (cardRect) {
       confetti({
         particleCount: 18,
         spread: 50,
-        origin: { x: (rect.left + rect.width / 2) / window.innerWidth, y: rect.top / window.innerHeight },
+        origin: { x: (cardRect.left + cardRect.width / 2) / window.innerWidth, y: cardRect.top / window.innerHeight },
         colors: [columns[to].color, "oklch(0.7 0.2 300)"],
         startVelocity: 20,
         gravity: 0.8,
         ticks: 60,
       });
     }
+    setLiveMessage(`Moved card from ${columns[from].title} to ${columns[to].title}.`);
+    toast.success(`Moved to ${columns[to].title}`, {
+      action: {
+        label: "Undo",
+        onClick: () => {
+          restoreBoard(previousColumns, previousCards);
+          void persistUpdate(
+            { id: cardId, status: from, display_order: currentIndex },
+            "Could not undo move.",
+            cardId
+          )
+            .catch(() => {
+              toast.error("Could not undo move.");
+            });
+          setLiveMessage(`Move undone. Back in ${columns[from].title}.`);
+        },
+      },
+    });
   };
 
   const activeCard = activeId ? cards[activeId] : null;
+  const handleDeleteCard = async (card: KanbanCardData) => {
+    const from = findStatus(card.id);
+    if (!from) return;
+    const previousColumns = JSON.parse(JSON.stringify(columns)) as typeof columns;
+    const previousCards = { ...cards };
+    const previousIndex = columns[from].cardIds.indexOf(card.id);
+    removeById(card.id);
+
+    const restoreDeletedCard = async () => {
+      try {
+        const response = await fetch("/api/applications", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            company: card.company,
+            role: card.role,
+            status: from,
+            location: card.location,
+            notes: card.notes,
+            applied_date: card.date || null,
+            fit_score: card.fitScore ?? null,
+            display_order: Math.max(previousIndex, 0),
+          }),
+        });
+        if (!response.ok) throw new Error(await parseApiError(response, "Could not undo delete."));
+        const restored = (await response.json()) as Application;
+        addOrUpdateFromApplication(restored);
+      } catch {
+        restoreBoard(previousColumns, previousCards);
+        toast.error("Could not undo delete.");
+      }
+    };
+
+    try {
+      const response = await fetch("/api/applications", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ id: card.id }),
+      });
+      if (!response.ok) throw new Error(await parseApiError(response, "Could not delete application."));
+      setSelected((current) => (current?.id === card.id ? null : current));
+      toast.success("Application deleted", {
+        action: {
+          label: "Undo",
+          onClick: () => {
+            void restoreDeletedCard();
+          },
+        },
+      });
+    } catch (error) {
+      restoreBoard(previousColumns, previousCards);
+      toast.error(error instanceof Error ? error.message : "Could not delete application.");
+    }
+  };
 
   return (
     <>
@@ -198,27 +335,50 @@ export const KanbanBoard = () => {
                   color={columns[status].color}
                   cards={cardList}
                   isOver={overColumn === status}
+                  activeCardId={activeId}
                   onSelectCard={setSelected}
+                  onDeleteCard={(card) => {
+                    void handleDeleteCard(card);
+                  }}
                 />
               </motion.div>
             );
           })}
         </div>
 
-        <DragOverlay adjustScale={false}>
+        <DragOverlay
+          adjustScale={false}
+          dropAnimation={{
+            duration: 300,
+            easing: "cubic-bezier(0.16, 1, 0.3, 1)",
+            sideEffects: defaultDropAnimationSideEffects({
+              styles: { active: { opacity: "0.35" } },
+            }),
+          }}
+        >
           {activeCard ? (
-            <div style={{ width: dragSize?.width }} className="shadow-glow-md">
+            <motion.div
+              style={{ width: dragSize?.width, height: dragSize?.height }}
+              className="shadow-glow-md"
+              initial={{ scale: 0.98, opacity: 0.9 }}
+              animate={{ scale: 1.02, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 360, damping: 28 }}
+            >
               <KanbanCardFace
                 company={activeCard.company}
                 role={activeCard.role}
                 date={activeCard.date}
                 location={activeCard.location}
                 fitScore={activeCard.fitScore}
+                className="border-white/20 bg-white/[0.05]"
               />
-            </div>
+            </motion.div>
           ) : null}
         </DragOverlay>
       </DndContext>
+      <p aria-live="polite" className="sr-only">
+        {liveMessage}
+      </p>
       <KanbanCardModal card={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} />
     </>
   );

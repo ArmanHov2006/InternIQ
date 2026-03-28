@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Briefcase, Plus } from "lucide-react";
+import { toast } from "sonner";
 import type { Application } from "@/types/database";
 import { AddApplicationDialog } from "@/components/dashboard/add-application-dialog";
 import { KanbanSkeleton } from "@/components/dashboard/kanban-skeleton";
@@ -16,21 +17,41 @@ export default function TrackerPage() {
   const { cards, hydrateFromApplications, addOrUpdateFromApplication } = useKanbanStore();
 
   useEffect(() => {
-    const run = async () => {
+    const syncApplications = async () => {
       try {
         const res = await fetch("/api/applications", {
           credentials: "same-origin",
           headers: { Accept: "application/json" },
         });
+        if (!res.ok) throw new Error("Could not load applications.");
         const applications = (await res.json()) as Application[];
-        if (res.ok) {
-          hydrateFromApplications(applications);
+        hydrateFromApplications(applications);
+      } catch {
+        const hasLocalCards = Object.keys(useKanbanStore.getState().cards).length > 0;
+        if (hasLocalCards) {
+          toast.info("Using demo data");
+        } else {
+          toast.error("Could not load applications.");
         }
       } finally {
         setLoading(false);
       }
     };
-    void run();
+    void syncApplications();
+
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") {
+        void syncApplications();
+      }
+    }, 45_000);
+    const onFocus = () => {
+      void syncApplications();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [hydrateFromApplications]);
 
   const cardCount = Object.keys(cards).length;
@@ -50,7 +71,7 @@ export default function TrackerPage() {
         <EmptyState
           icon={<Briefcase className="h-5 w-5" />}
           title="No applications yet"
-          description="Start tracking your internship pipeline by adding your first application."
+          description="Start tracking your application pipeline by adding your first application."
           action={
             <MagneticButton className="gap-2" onClick={() => setDialogOpen(true)}>
               <Plus className="h-4 w-4" />

@@ -3,6 +3,7 @@
 import { useDroppable } from "@dnd-kit/core";
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { AnimatePresence, motion } from "framer-motion";
+import { memo } from "react";
 import { KanbanCard } from "@/components/kanban/kanban-card";
 import { cn } from "@/lib/utils";
 import type { KanbanCardData, StatusId } from "@/stores/kanban-store";
@@ -13,20 +14,32 @@ interface KanbanColumnProps {
   color: string;
   cards: KanbanCardData[];
   isOver: boolean;
+  activeCardId?: string | null;
   onSelectCard: (card: KanbanCardData) => void;
+  onDeleteCard: (card: KanbanCardData) => void;
 }
 
-export const KanbanColumn = ({ id, title, color, cards, isOver, onSelectCard }: KanbanColumnProps) => {
+export const KanbanColumn = memo(({ id, title, color, cards, isOver, activeCardId, onSelectCard, onDeleteCard }: KanbanColumnProps) => {
   const { setNodeRef } = useDroppable({ id, data: { type: "column", status: id } });
+  const isDragging = Boolean(activeCardId);
 
   return (
     <section
       ref={setNodeRef}
+      role="list"
+      aria-label={`${title} column`}
       className={cn(
-        "glass rounded-2xl p-3 transition-all min-h-[420px]",
-        isOver && "border-white/20 shadow-glow-md"
+        "glass min-h-[420px] rounded-2xl p-3 transition-all duration-200",
+        isDragging && "border-white/10",
+        isOver && "border-white/30 shadow-glow-md"
       )}
-      style={{ boxShadow: isOver ? `0 0 30px color-mix(in oklab, ${color} 50%, transparent)` : undefined }}
+      style={{
+        boxShadow: isOver
+          ? `0 0 34px color-mix(in oklab, ${color} 55%, transparent)`
+          : undefined,
+        backgroundColor: isOver ? "color-mix(in oklab, white 4%, transparent)" : undefined,
+        transition: "box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+      }}
     >
       <div className="mb-3">
         <div className="h-1.5 rounded-full" style={{ backgroundColor: color }} />
@@ -51,18 +64,27 @@ export const KanbanColumn = ({ id, title, color, cards, isOver, onSelectCard }: 
                   location={card.location}
                   fitScore={card.fitScore}
                   status={id}
+                  dragging={activeCardId === card.id}
                   onClick={() => onSelectCard(card)}
+                  onEdit={() => onSelectCard(card)}
+                  onDelete={() => onDeleteCard(card)}
                 />
               </motion.div>
             ))}
           </AnimatePresence>
-          {!cards.length ? (
-            <div className="mt-3 rounded-xl border border-dashed border-white/20 py-10 text-center text-sm text-muted-foreground animate-pulse">
-              Drag here
-            </div>
-          ) : null}
+          <div
+            className={cn(
+              "mt-3 rounded-xl border border-dashed border-white/20 py-10 text-center text-sm text-muted-foreground transition-all",
+              "min-h-[110px] flex items-center justify-center",
+              cards.length > 0 && "py-4 min-h-[72px]",
+              isOver && "scale-[1.01] border-white/40 bg-white/[0.04] text-foreground"
+            )}
+          >
+            {isOver ? "Drop here" : cards.length ? " " : "Drag here"}
+          </div>
         </div>
       </SortableContext>
     </section>
   );
-};
+});
+KanbanColumn.displayName = "KanbanColumn";
