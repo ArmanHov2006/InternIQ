@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routers.analyze import router as analyze_router
+from routers.chat import router as chat_router
 from routers.cover_letter import router as cover_letter_router
 from routers.email import router as email_router
 from routers.interview_prep import router as interview_prep_router
@@ -31,6 +32,7 @@ app.add_middleware(
 )
 
 app.include_router(analyze_router)
+app.include_router(chat_router)
 app.include_router(email_router)
 app.include_router(interview_prep_router)
 app.include_router(cover_letter_router)

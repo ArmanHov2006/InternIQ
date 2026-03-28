@@ -101,3 +101,28 @@ export interface Resume {
   is_primary: boolean;
   created_at: string;
 }
+
+export interface ApplicationStatusSuggestion {
+  id: string;
+  user_id: string;
+  application_id: string;
+  email_event_id: string;
+  from_status: string;
+  to_status: string;
+  confidence: number;
+  reason: string;
+  status: "pending" | "accepted" | "rejected";
+  acted_at: string | null;
+  acted_by_source: string | null;
+  created_at: string;
+}
+
+export interface EmailEvent {
+  id: string;
+  user_id: string;
+  from_email: string;
+  subject: string;
+  snippet: string;
+  received_at: string;
+  created_at: string;
+}

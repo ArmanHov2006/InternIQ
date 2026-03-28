@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { IconFrame, SearchGlyph } from "@/components/ui/icons/premium-icons";
 import { dispatchOpenAddApplication } from "@/lib/events";
+import { useChatStore } from "@/stores/chat-store";
 
 const navItems = [
   { label: "Overview", href: "/dashboard" },
@@ -93,6 +94,13 @@ export const CommandPalette = () => {
       onSelect: () => {
         setOpen(false);
         dispatchOpenAddApplication();
+      },
+    },
+    {
+      label: "Chat with AI",
+      onSelect: () => {
+        setOpen(false);
+        useChatStore.getState().open();
       },
     },
     {

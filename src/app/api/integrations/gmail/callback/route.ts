@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site";
 import { isGmailAutomationEnabled } from "@/lib/features";
@@ -23,12 +24,8 @@ export async function GET(request: Request) {
   const url = new URL(request.url);
   const code = url.searchParams.get("code");
   const state = url.searchParams.get("state");
-  const stateCookie = request.headers
-    .get("cookie")
-    ?.split(";")
-    .map((cookie) => cookie.trim())
-    .find((cookie) => cookie.startsWith("interniq_gmail_oauth_state="))
-    ?.split("=")[1];
+  const cookieStore = cookies();
+  const stateCookie = cookieStore.get("interniq_gmail_oauth_state")?.value;
 
   if (!code || !state || !stateCookie || stateCookie !== state) {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=oauth_state_invalid`);

@@ -6,6 +6,7 @@ import anthropic
 
 from services.prompts import (
     ANALYZE_SYSTEM_PROMPT,
+    CHATBOT_SYSTEM_PROMPT,
     COVER_LETTER_SYSTEM_PROMPT,
     EMAIL_SYSTEM_PROMPT,
     INTERVIEW_PREP_SYSTEM_PROMPT,
@@ -169,3 +170,146 @@ async def tailor_resume(resume_text: str, job_description: str) -> Dict[str, Any
         block.text for block in message.content if getattr(block, "type", "") == "text"
     )
     return _extract_json_from_response(text)
+
+
+_CHAT_TOOLS = [
+    {
+        "name": "navigate_to_page",
+        "description": "Navigate the user to a specific page in the InternIQ dashboard",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "page": {
+                    "type": "string",
+                    "enum": [
+                        "overview",
+                        "tracker",
+                        "profile",
+                        "analyze",
+                        "email",
+                        "automation",
+                        "interview-prep",
+                        "cover-letter",
+                        "resume-tailor",
+                    ],
+                    "description": "The dashboard page to navigate to",
+                }
+            },
+            "required": ["page"],
+        },
+    },
+    {
+        "name": "add_application",
+        "description": "Add a new internship/job application to the user's tracker board",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "company": {"type": "string", "description": "Company name"},
+                "role": {"type": "string", "description": "Job/internship title"},
+                "status": {
+                    "type": "string",
+                    "enum": ["saved", "applied", "interview", "offer", "rejected"],
+                    "description": "Application status (defaults to saved)",
+                },
+                "location": {"type": "string", "description": "Job location"},
+                "job_url": {"type": "string", "description": "URL of the job posting"},
+                "notes": {"type": "string", "description": "Any notes about the application"},
+            },
+            "required": ["company", "role"],
+        },
+    },
+    {
+        "name": "open_add_dialog",
+        "description": "Open the Quick Add Application dialog for the user to fill in details manually",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "set_tracker_filter",
+        "description": "Set a search query or status filter on the application tracker and navigate there",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "search": {
+                    "type": "string",
+                    "description": "Search query for company or role",
+                },
+                "status_filter": {
+                    "type": "string",
+                    "enum": ["saved", "applied", "interview", "offer", "rejected"],
+                    "description": "Filter by application status",
+                },
+            },
+        },
+    },
+]
+
+
+async def chat_completion(messages: list, context: dict) -> Dict[str, Any]:
+    client = _get_client()
+    system = CHATBOT_SYSTEM_PROMPT
+    if context:
+        system += f"\n\nCURRENT USER CONTEXT:\n{json.dumps(context, indent=2)}"
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=800,
+        system=system,
+        messages=messages,
+        tools=_CHAT_TOOLS,
+    )
+
+    reply_parts: list[str] = []
+    actions: list[Dict[str, Any]] = []
+    tool_use_blocks = []
+
+    for block in response.content:
+        if getattr(block, "type", "") == "text":
+            reply_parts.append(block.text)
+        elif getattr(block, "type", "") == "tool_use":
+            actions.append({"type": block.name, "payload": block.input})
+            tool_use_blocks.append(block)
+
+    if response.stop_reason == "tool_use" and tool_use_blocks:
+        assistant_content = []
+        for block in response.content:
+            if getattr(block, "type", "") == "text":
+                assistant_content.append({"type": "text", "text": block.text})
+            elif getattr(block, "type", "") == "tool_use":
+                assistant_content.append(
+                    {
+                        "type": "tool_use",
+                        "id": block.id,
+                        "name": block.name,
+                        "input": block.input,
+                    }
+                )
+
+        tool_results = [
+            {
+                "type": "tool_result",
+                "tool_use_id": b.id,
+                "content": f"Action '{b.name}' queued for client execution.",
+            }
+            for b in tool_use_blocks
+        ]
+
+        follow_up = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=300,
+            system=system,
+            messages=[
+                *messages,
+                {"role": "assistant", "content": assistant_content},
+                {"role": "user", "content": tool_results},
+            ],
+        )
+
+        reply_parts = [
+            b.text for b in follow_up.content if getattr(b, "type", "") == "text"
+        ]
+
+    reply = "\n".join(reply_parts).strip() or "Done!"
+    return {"reply": reply, "actions": actions}

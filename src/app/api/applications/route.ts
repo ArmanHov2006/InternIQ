@@ -47,29 +47,7 @@ const demoApps = new Map<string, Application>([
 ]);
 const statusAliasCacheByUser = new Map<string, Partial<Record<Application["status"], string>>>();
 
-const APPLICATION_COLUMNS = [
-  "id",
-  "user_id",
-  "company",
-  "role",
-  "job_url",
-  "status",
-  "applied_date",
-  "salary_range",
-  "location",
-  "notes",
-  "fit_score",
-  "fit_analysis",
-  "contact_name",
-  "contact_email",
-  "generated_email",
-  "display_order",
-  "last_status_change_source",
-  "last_status_change_reason",
-  "last_status_change_at",
-  "created_at",
-  "updated_at",
-].join(", ");
+const APPLICATION_COLUMNS = "*";
 
 const APPLICATION_CREATE_KEYS = new Set([
   "company",

@@ -15,6 +15,11 @@ const CommandPalette = dynamic(
   { ssr: false }
 );
 
+const Chatbot = dynamic(
+  () => import("@/components/ai/chatbot").then((mod) => mod.Chatbot),
+  { ssr: false }
+);
+
 export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
@@ -48,6 +53,7 @@ export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
       <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((v) => !v)} />
       <MobileTopBar />
       <CommandPalette />
+      <Chatbot />
       <main
         id="main-content"
         className={collapsed ? "p-6 pt-24 md:pl-24 md:pt-6" : "p-6 pt-24 md:pl-80 md:pt-6"}

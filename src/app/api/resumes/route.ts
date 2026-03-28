@@ -43,10 +43,10 @@ const parseBody = async (
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 500 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   if (body === null || typeof body !== "object" || Array.isArray(body)) {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 500 });
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
   return body as Record<string, unknown>;
 };
@@ -98,23 +98,23 @@ export async function POST(request: Request) {
     try {
       formData = await request.formData();
     } catch {
-      return NextResponse.json({ error: "Invalid form data" }, { status: 500 });
+      return NextResponse.json({ error: "Invalid form data" }, { status: 400 });
     }
 
     const fileEntry = formData.get("file");
     if (!(fileEntry instanceof File)) {
-      return NextResponse.json({ error: "No file provided" }, { status: 500 });
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
     if (!fileEntry.name.toLowerCase().endsWith(".pdf")) {
       return NextResponse.json(
         { error: "Resume must be a PDF file" },
-        { status: 500 }
+        { status: 400 }
       );
     }
     if (fileEntry.size > MAX_RESUME_BYTES) {
       return NextResponse.json(
         { error: "Resume must be 5MB or smaller" },
-        { status: 500 }
+        { status: 400 }
       );
     }
     const parsedText = await extractTextFromPdfBytes(
@@ -196,13 +196,13 @@ export async function PUT(request: Request) {
     if (typeof id !== "string" || id.trim() === "") {
       return NextResponse.json(
         { error: "Missing id in request body" },
-        { status: 500 }
+        { status: 400 }
       );
     }
     if (typeof isPrimary !== "boolean") {
       return NextResponse.json(
         { error: "is_primary must be a boolean" },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
@@ -251,7 +251,7 @@ export async function DELETE(request: Request) {
     if (typeof id !== "string" || id.trim() === "") {
       return NextResponse.json(
         { error: "Missing id in request body" },
-        { status: 500 }
+        { status: 400 }
       );
     }
 
