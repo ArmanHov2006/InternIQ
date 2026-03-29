@@ -13,13 +13,25 @@ const HeroFallback = () => (
     <div className="absolute left-1/2 top-1/2 h-56 w-56 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/25 blur-[80px] animate-pulse" />
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,oklch(0.65_0.25_265_/_20%),transparent_45%)]" />
     <motion.div
-      animate={{ rotateY: [0, 8, -8, 0], rotateX: [0, 3, -3, 0], y: [0, -8, 0] }}
+      animate={{ 
+        rotateY: [0, 8, -8, 0], 
+        rotateX: [0, 3, -3, 0], 
+        y: [0, -8, 0],
+      }}
       transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
       className="absolute left-1/2 top-1/2 h-56 w-80 -translate-x-1/2 -translate-y-1/2 [transform-style:preserve-3d]"
     >
-      <div className="glass absolute inset-0 rounded-2xl border-white/15" />
-      <div className="glass absolute -right-8 -top-8 h-36 w-56 rounded-2xl border-accent/30 bg-accent/10" />
-      <div className="glass absolute -bottom-8 -left-10 h-28 w-48 rounded-2xl border-accent-cyan/30 bg-accent-cyan/10" />
+      <div className="glass absolute inset-0 rounded-2xl border-white/15 shadow-glow-md" />
+      <motion.div 
+        animate={{ y: [0, -4, 0] }}
+        transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+        className="glass absolute -right-8 -top-8 h-36 w-56 rounded-2xl border-accent/30 bg-accent/10 shadow-glow-sm" 
+      />
+      <motion.div 
+        animate={{ y: [0, 4, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut", delay: 0.5 }}
+        className="glass absolute -bottom-8 -left-10 h-28 w-48 rounded-2xl border-accent-cyan/30 bg-accent-cyan/10 shadow-glow-sm" 
+      />
     </motion.div>
   </div>
 );
@@ -36,15 +48,15 @@ export const HeroSection = () => {
   }, [words.length]);
 
   return (
-    <section className="relative min-h-screen px-4 pb-20 pt-28">
+    <section className="relative min-h-screen px-4 pb-16 pt-24 sm:pb-20 sm:pt-28">
       <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:22px_22px]" />
       <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-10 top-20 h-[420px] w-[420px] rounded-full bg-primary/20 blur-[100px] animate-float" />
-        <div className="absolute bottom-0 right-4 h-[440px] w-[440px] rounded-full bg-accent/20 blur-[100px] animate-float" />
-        <div className="absolute left-1/2 top-1/3 h-[260px] w-[260px] -translate-x-1/2 rounded-full bg-accent-cyan/20 blur-[90px]" />
+        <div className="absolute left-10 top-20 h-[280px] w-[280px] sm:h-[420px] sm:w-[420px] rounded-full bg-primary/20 blur-[80px] sm:blur-[100px] animate-float" />
+        <div className="absolute bottom-0 right-4 h-[300px] w-[300px] sm:h-[440px] sm:w-[440px] rounded-full bg-accent/20 blur-[80px] sm:blur-[100px] animate-float" />
+        <div className="absolute left-1/2 top-1/3 h-[180px] w-[180px] sm:h-[260px] sm:w-[260px] -translate-x-1/2 rounded-full bg-accent-cyan/20 blur-[70px] sm:blur-[90px]" />
       </div>
 
-      <div className="relative mx-auto grid max-w-7xl gap-12 lg:grid-cols-[60%_40%]">
+      <div className="relative mx-auto grid max-w-7xl gap-8 sm:gap-12 lg:grid-cols-[60%_40%]">
         <div className="space-y-8">
           <SectionReveal>
             <span className="glass inline-flex rounded-full px-4 py-1 text-sm">Built for ambitious careers</span>

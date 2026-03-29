@@ -6,8 +6,9 @@ import { Activity, Bot, Mail, UserRound } from "lucide-react";
 
 export const FeaturesBento = () => {
   return (
-    <section id="features" className="px-4 py-20">
-      <div className="mx-auto grid max-w-7xl gap-4 lg:grid-cols-4">
+    <section id="features" className="relative px-4 py-16 sm:py-20">
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:22px_22px]" />
+      <div className="mx-auto grid max-w-7xl gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-4">
         <SectionReveal className="lg:col-span-2 lg:row-span-2">
           <BentoCard className="h-full transition hover:scale-[1.01] hover:shadow-glow-md" colSpan={2} rowSpan={2}>
             <h3 className="text-xl font-semibold md:text-2xl">Interactive Mini Tracker</h3>
@@ -27,7 +28,7 @@ export const FeaturesBento = () => {
         </SectionReveal>
 
         <SectionReveal className="lg:col-span-2">
-          <BentoCard colSpan={2} className="transition hover:scale-[1.01] hover:shadow-glow-sm">
+          <BentoCard colSpan={2} className="transition hover:scale-[1.01] hover:shadow-glow-md">
             <div className="mb-3 inline-flex rounded-lg border border-white/10 bg-white/5 p-2">
               <Bot className="h-4 w-4 text-primary" />
             </div>
@@ -54,7 +55,7 @@ export const FeaturesBento = () => {
         </SectionReveal>
 
         <SectionReveal className="lg:row-span-2">
-          <BentoCard rowSpan={2} className="h-full transition hover:scale-[1.01] hover:shadow-glow-sm">
+          <BentoCard rowSpan={2} className="h-full transition hover:scale-[1.01] hover:shadow-glow-md">
             <div className="mb-3 inline-flex rounded-lg border border-white/10 bg-white/5 p-2">
               <UserRound className="h-4 w-4 text-accent" />
             </div>

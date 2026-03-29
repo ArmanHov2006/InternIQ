@@ -56,7 +56,7 @@ export const DashboardShell = ({ children }: { children: React.ReactNode }) => {
       <Chatbot />
       <main
         id="main-content"
-        className={collapsed ? "p-6 pt-24 md:pl-24 md:pt-6" : "p-6 pt-24 md:pl-80 md:pt-6"}
+        className={collapsed ? "p-4 pt-24 sm:p-6 md:pl-24 md:pt-6" : "p-4 pt-24 sm:p-6 md:pl-80 md:pt-6"}
       >
         <AnimatePresence mode="wait">
           <motion.div

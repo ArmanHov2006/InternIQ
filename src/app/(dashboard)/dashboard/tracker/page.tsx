@@ -59,8 +59,11 @@ export default function TrackerPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <h1 className="font-display text-4xl md:text-5xl">Tracker</h1>
-        <MagneticButton className="gap-2" onClick={() => setDialogOpen(true)}>
+        <div>
+          <h1 className="font-display text-4xl md:text-5xl">Tracker</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Drag applications across columns to track your progress</p>
+        </div>
+        <MagneticButton className="gap-2 glow-sm" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           Add Application
         </MagneticButton>
