@@ -225,10 +225,10 @@ export const Chatbot = () => {
       <motion.button
         onClick={toggle}
         aria-label="Toggle AI assistant"
-        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-glow-md transition-shadow"
+        className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-glow-md transition-all"
         animate={{ scale: isOpen ? 0 : 1, opacity: isOpen ? 0 : 1 }}
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.12, y: -2 }}
+        whileTap={{ scale: 0.92 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
         style={{ pointerEvents: isOpen ? "none" : "auto" }}
       >

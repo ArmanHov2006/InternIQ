@@ -69,7 +69,12 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <h1 className="font-display text-4xl md:text-5xl">Overview</h1>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="font-display text-4xl md:text-5xl">Overview</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Track your application journey at a glance</p>
+        </div>
+      </div>
       {loading ? (
         <div className="grid gap-4 lg:grid-cols-4">
           <StatCardSkeleton />
@@ -85,9 +90,9 @@ export default function DashboardPage() {
           <StatCard label="Offers" value={metrics.offers} trend={metrics.offers > 0 ? "Momentum building" : "No offers yet"} data={sparkline} />
         </div>
       )}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         <MagneticButton
-          className="gap-2"
+          className="gap-2 glow-sm"
           onClick={() => {
             dispatchOpenAddApplication();
           }}
@@ -99,7 +104,7 @@ export default function DashboardPage() {
         </MagneticButton>
         <MagneticButton
           variant="outline"
-          className="gap-2"
+          className="gap-2 border-white/20 bg-white/[0.02]"
           onClick={() => router.push("/dashboard/profile")}
         >
           <IconFrame className="h-6 w-6 rounded-md border-white/10 bg-white/[0.03]">
@@ -109,7 +114,7 @@ export default function DashboardPage() {
         </MagneticButton>
         <MagneticButton
           variant="outline"
-          className="gap-2"
+          className="gap-2 border-white/20 bg-white/[0.02]"
           onClick={() => router.push("/dashboard/email")}
         >
           <IconFrame className="h-6 w-6 rounded-md border-white/10 bg-white/[0.03]">
@@ -138,32 +143,43 @@ export default function DashboardPage() {
       ) : null}
       {applications.length > 0 ? (
         <>
-          <GlassCard className="p-5">
+          <GlassCard className="p-6">
             <h2 className="text-xl font-semibold">Pipeline Funnel</h2>
-            <div className="mt-4 overflow-hidden rounded-full border border-white/10 bg-white/5">
-              <div className="flex h-4 w-full">
-                {pipelineStatuses.map((status) => {
-                  const width = metrics.total ? (metrics.byStatus[status] / metrics.total) * 100 : 0;
-                  if (width === 0) return null;
-                  return <div key={status} className={pipelineColors[status]} style={{ width: `${width}%` }} />;
-                })}
-              </div>
-            </div>
-            <div className="mt-3 flex flex-wrap gap-3 text-xs text-muted-foreground">
-              {pipelineStatuses.map((status) => (
-                <span key={status} className="inline-flex items-center gap-1">
-                  <span className={`h-2 w-2 rounded-full ${pipelineColors[status]}`} />
-                  {status.replace("_", " ")} ({metrics.byStatus[status]})
-                </span>
-              ))}
+            <p className="mt-1 text-sm text-muted-foreground">Your applications across all stages</p>
+            <div className="mt-6 space-y-3">
+              {pipelineStatuses.map((status) => {
+                const count = metrics.byStatus[status];
+                const width = metrics.total ? (count / metrics.total) * 100 : 0;
+                return (
+                  <div key={status} className="space-y-1.5">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="capitalize text-foreground font-medium">{status.replace("_", " ")}</span>
+                      <span className="text-muted-foreground">{count}</span>
+                    </div>
+                    <div className="overflow-hidden rounded-full border border-white/10 bg-white/5 h-2">
+                      <div 
+                        className={`h-full transition-all duration-300 ${pipelineColors[status]}`} 
+                        style={{ width: `${width}%` }} 
+                      />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </GlassCard>
-          <GlassCard className="p-5">
+          <GlassCard className="p-6">
             <h2 className="text-xl font-semibold">Recent Activity</h2>
-            <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-muted-foreground">Your latest applications</p>
+            <ul className="mt-4 space-y-2">
               {recentActivity.map((application) => (
-                <li key={application.id}>
-                  {application.company} · {application.role} · {application.status.replace("_", " ")}
+                <li key={application.id} className="flex items-center justify-between rounded-lg border border-white/5 bg-white/[0.02] p-3 text-sm">
+                  <div>
+                    <p className="font-medium">{application.company}</p>
+                    <p className="text-muted-foreground text-xs">{application.role}</p>
+                  </div>
+                  <span className="text-xs font-medium text-primary capitalize bg-primary/20 px-2.5 py-1 rounded-full">
+                    {application.status.replace("_", " ")}
+                  </span>
                 </li>
               ))}
             </ul>
