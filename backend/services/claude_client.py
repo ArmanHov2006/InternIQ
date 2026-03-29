@@ -200,12 +200,20 @@ _CHAT_TOOLS = [
     },
     {
         "name": "add_application",
-        "description": "Add a new internship/job application to the user's tracker board",
+        "description": (
+            "Add a new internship/job application to the user's tracker board. "
+            "Use this whenever the user mentions applying somewhere, getting an interview, "
+            "receiving an offer, being rejected, or wanting to track/save a job. "
+            "Extract company, role, status, location, and any pay/salary info from their message."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
                 "company": {"type": "string", "description": "Company name"},
-                "role": {"type": "string", "description": "Job/internship title"},
+                "role": {
+                    "type": "string",
+                    "description": "Job/internship title. If not specified, use 'General Application'",
+                },
                 "status": {
                     "type": "string",
                     "enum": ["saved", "applied", "interview", "offer", "rejected"],
@@ -216,6 +224,30 @@ _CHAT_TOOLS = [
                 "notes": {"type": "string", "description": "Any notes about the application"},
             },
             "required": ["company", "role"],
+        },
+    },
+    {
+        "name": "update_application",
+        "description": (
+            "Update an existing application's status or details. Use when user says "
+            "things like 'move Google to interview', 'I got rejected from Meta', "
+            "'update my Stripe notes'. Match by company name from the context."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "company": {
+                    "type": "string",
+                    "description": "Company name to match against existing applications",
+                },
+                "status": {
+                    "type": "string",
+                    "enum": ["saved", "applied", "interview", "offer", "rejected"],
+                    "description": "New status to set",
+                },
+                "notes": {"type": "string", "description": "Notes to append"},
+            },
+            "required": ["company"],
         },
     },
     {

@@ -127,27 +127,94 @@ export const Chatbot = () => {
             break;
           }
           case "add_application": {
-            try {
-              await fetch("/api/applications", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  company: action.payload.company,
-                  role: action.payload.role,
-                  status: action.payload.status || "saved",
-                  location: action.payload.location || "",
-                  job_url: action.payload.job_url || "",
-                  notes: action.payload.notes || "",
-                }),
-              });
-            } catch {
-              /* API error is surfaced via the reply text */
-            }
+            const company = (action.payload.company as string) || "Unknown";
+            const role = (action.payload.role as string) || "General Application";
+            const status = (action.payload.status as StatusId) || "saved";
+            const location = (action.payload.location as string) || "";
+            const notes = (action.payload.notes as string) || "";
+            const jobUrl = (action.payload.job_url as string) || "";
+            const id = crypto.randomUUID?.() ?? `local-${Date.now()}`;
+
+            // Add to kanban store immediately so the card appears on the board
+            const { addOrUpdateFromApplication } = useKanbanStore.getState();
+            addOrUpdateFromApplication({
+              id,
+              user_id: "",
+              company,
+              role,
+              status,
+              applied_date: new Date().toISOString().split("T")[0],
+              location,
+              notes,
+              job_url: jobUrl,
+              salary_range: "",
+              fit_score: null,
+              fit_analysis: "",
+              contact_name: "",
+              contact_email: "",
+              generated_email: "",
+              display_order: 0,
+              last_status_change_source: "manual",
+              last_status_change_reason: "Added via chatbot",
+              last_status_change_at: new Date().toISOString(),
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+            });
+
+            // Also try to persist to the API (non-blocking)
+            fetch("/api/applications", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ company, role, status, location, job_url: jobUrl, notes }),
+            }).catch(() => {});
             break;
           }
           case "open_add_dialog":
             dispatchOpenAddApplication();
             break;
+          case "update_application": {
+            const company = (action.payload.company as string) || "";
+            const newStatus = action.payload.status as StatusId | undefined;
+            const newNotes = action.payload.notes as string | undefined;
+
+            const allCards = Object.values(useKanbanStore.getState().cards);
+            const match = allCards.find((c) =>
+              c.company.toLowerCase().includes(company.toLowerCase())
+            );
+
+            if (match && newStatus) {
+              const currentStatus = (
+                Object.keys(useKanbanStore.getState().columns) as StatusId[]
+              ).find((s) =>
+                useKanbanStore.getState().columns[s].cardIds.includes(match.id)
+              );
+              if (currentStatus && currentStatus !== newStatus) {
+                useKanbanStore.getState().moveCard(match.id, currentStatus, newStatus, 0);
+              }
+            }
+            if (match && newNotes) {
+              const existing = match.notes || "";
+              useKanbanStore.getState().setCardNotes(
+                match.id,
+                existing ? `${existing}\n${newNotes}` : newNotes
+              );
+            }
+
+            if (match) {
+              fetch("/api/applications", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  id: match.id,
+                  ...(newStatus && { status: newStatus }),
+                  ...(newNotes && {
+                    notes: (match.notes || "") + "\n" + newNotes,
+                  }),
+                }),
+              }).catch(() => {});
+            }
+            break;
+          }
           case "set_tracker_filter": {
             if (typeof action.payload.search === "string")
               setSearch(action.payload.search);

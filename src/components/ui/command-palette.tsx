@@ -45,6 +45,11 @@ export const CommandPalette = () => {
         setOpen((prev) => !prev);
         return;
       }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "j") {
+        event.preventDefault();
+        useChatStore.getState().toggle();
+        return;
+      }
       if (event.key === "Escape") {
         setOpen(false);
         setSequence("");
@@ -172,6 +177,7 @@ export const CommandPalette = () => {
               </Command.List>
               <div className="border-t border-white/10 px-3 py-2 text-xs text-muted-foreground">
                 <span className="mr-3">Ctrl/Cmd+K open</span>
+                <span className="mr-3">Ctrl/Cmd+J chat</span>
                 <span className="mr-3">C quick add</span>
                 <span className="mr-3">G then D/T/P jump</span>
                 <span>? shortcuts</span>
