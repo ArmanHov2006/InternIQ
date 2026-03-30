@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { checkAiRateLimit } from "@/lib/rate-limit";
 
 type RequestBody = {
   job_url?: string;
@@ -36,6 +37,9 @@ export async function POST(request: Request) {
       data: { user },
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const rateLimited = checkAiRateLimit(request, user.id);
+    if (rateLimited) return rateLimited;
 
     const {
       data: { session },

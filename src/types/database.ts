@@ -90,6 +90,8 @@ export interface Application {
   last_status_change_at: string;
   created_at: string;
   updated_at: string;
+  /** JSON from DB: cover letter, interview prep, resume tailor drafts */
+  ai_metadata?: Record<string, unknown> | null;
 }
 
 export interface Resume {

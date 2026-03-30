@@ -37,6 +37,7 @@ const createDemoApp = (
     last_status_change_at: now,
     created_at: now,
     updated_at: now,
+    ai_metadata: {},
   };
 };
 
@@ -67,6 +68,7 @@ const APPLICATION_CREATE_KEYS = new Set([
   "last_status_change_source",
   "last_status_change_reason",
   "last_status_change_at",
+  "ai_metadata",
 ]);
 
 const APPLICATION_UPDATE_KEYS = new Set([
@@ -87,6 +89,7 @@ const APPLICATION_UPDATE_KEYS = new Set([
   "last_status_change_source",
   "last_status_change_reason",
   "last_status_change_at",
+  "ai_metadata",
   "id",
 ]);
 
@@ -472,6 +475,13 @@ export async function PUT(request: Request) {
         notes: typeof body.notes === "string" ? body.notes : existing.notes,
         job_url: typeof body.job_url === "string" ? body.job_url : existing.job_url,
         fit_score: typeof body.fit_score === "number" ? body.fit_score : existing.fit_score,
+        fit_analysis: typeof body.fit_analysis === "string" ? body.fit_analysis : existing.fit_analysis,
+        generated_email:
+          typeof body.generated_email === "string" ? body.generated_email : existing.generated_email,
+        ai_metadata:
+          body.ai_metadata !== undefined && typeof body.ai_metadata === "object" && body.ai_metadata !== null
+            ? (body.ai_metadata as Record<string, unknown>)
+            : existing.ai_metadata ?? {},
         applied_date:
           typeof body.applied_date === "string"
             ? body.applied_date

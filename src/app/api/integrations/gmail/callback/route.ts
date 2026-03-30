@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getSiteUrl } from "@/lib/site";
 import { isGmailAutomationEnabled } from "@/lib/features";
+import { encryptToken } from "@/lib/crypto";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ const GMAIL_PROFILE_ENDPOINT = "https://gmail.googleapis.com/gmail/v1/users/me/p
 
 export async function GET(request: Request) {
   if (!isGmailAutomationEnabled()) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=feature_disabled`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=feature_disabled`);
   }
   const supabase = createClient();
   const {
@@ -28,13 +29,13 @@ export async function GET(request: Request) {
   const stateCookie = cookieStore.get("interniq_gmail_oauth_state")?.value;
 
   if (!code || !state || !stateCookie || stateCookie !== state) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=oauth_state_invalid`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=oauth_state_invalid`);
   }
 
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=oauth_config_missing`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=oauth_config_missing`);
   }
 
   const tokenBody = new URLSearchParams({
@@ -51,7 +52,7 @@ export async function GET(request: Request) {
     body: tokenBody,
   });
   if (!tokenResponse.ok) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=oauth_exchange_failed`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=oauth_exchange_failed`);
   }
   const tokenPayload = (await tokenResponse.json()) as {
     access_token: string;
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
     headers: { Authorization: `Bearer ${tokenPayload.access_token}` },
   });
   if (!profileResponse.ok) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=gmail_profile_failed`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=gmail_profile_failed`);
   }
   const profile = (await profileResponse.json()) as { emailAddress: string };
   const expiresAt = new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString();
@@ -72,18 +73,18 @@ export async function GET(request: Request) {
       user_id: user.id,
       provider: "gmail",
       provider_account_email: profile.emailAddress.toLowerCase(),
-      access_token: tokenPayload.access_token,
-      refresh_token: tokenPayload.refresh_token ?? "",
+      access_token: encryptToken(tokenPayload.access_token),
+      refresh_token: tokenPayload.refresh_token ? encryptToken(tokenPayload.refresh_token) : "",
       access_token_expires_at: expiresAt,
       is_active: true,
     },
     { onConflict: "user_id,provider" }
   );
   if (upsertError) {
-    return NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?error=connection_save_failed`);
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=connection_save_failed`);
   }
 
-  const response = NextResponse.redirect(`${getSiteUrl()}/dashboard/automation?connected=1`);
+  const response = NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&connected=1`);
   response.cookies.set("interniq_gmail_oauth_state", "", { maxAge: 0, path: "/" });
   return response;
 }

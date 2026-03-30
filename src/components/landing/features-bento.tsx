@@ -6,7 +6,7 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { InteractiveDemo } from "@/components/landing/interactive-demo";
 import { SectionReveal } from "@/components/ui/section-reveal";
 import { GradientText } from "@/components/ui/gradient-text";
-import { Activity, Bot, Mail, UserRound, BarChart3, FileText, Sparkles, ArrowUpRight } from "lucide-react";
+import { Bot, Mail, UserRound, BarChart3, Sparkles, ArrowUpRight } from "lucide-react";
 
 const AITypingEffect = () => {
   return (

@@ -17,12 +17,13 @@ import {
   type DragStartEvent,
 } from "@dnd-kit/core";
 import { sortableKeyboardCoordinates } from "@dnd-kit/sortable";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanCardFace } from "@/components/kanban/kanban-card";
-import { KanbanCardModal } from "@/components/kanban/kanban-card-modal";
+import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import { KanbanFilters } from "@/components/kanban/kanban-filters";
 import { useKanbanStore, type KanbanCardData, type StatusId } from "@/stores/kanban-store";
 import type { Application } from "@/types/database";
@@ -42,13 +43,48 @@ export const KanbanBoard = () => {
     setSearch,
     filter,
     setFilter,
+    applicationsById,
+    setApplicationRecord,
+    hydrateFromApplications,
   } = useKanbanStore();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overColumn, setOverColumn] = useState<StatusId | null>(null);
-  const [selected, setSelected] = useState<KanbanCardData | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dragSize, setDragSize] = useState<{ width: number; height: number } | null>(null);
   const [liveMessage, setLiveMessage] = useState("");
   const updateRequestControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const replacePipelineAppQuery = (appId: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (appId) params.set("app", appId);
+    else params.delete("app");
+    const q = params.toString();
+    router.replace(q ? `/dashboard/pipeline?${q}` : "/dashboard/pipeline", { scroll: false });
+  };
+
+  useEffect(() => {
+    const appId = searchParams.get("app");
+    if (appId) setSelectedId(appId);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!selectedId || applicationsById[selectedId]) return;
+    void (async () => {
+      try {
+        const res = await fetch("/api/applications", {
+          credentials: "same-origin",
+          headers: { Accept: "application/json" },
+        });
+        if (!res.ok) return;
+        const applications = (await res.json()) as Application[];
+        hydrateFromApplications(applications);
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [selectedId, applicationsById, hydrateFromApplications]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
@@ -298,7 +334,13 @@ export const KanbanBoard = () => {
         body: JSON.stringify({ id: card.id }),
       });
       if (!response.ok) throw new Error(await parseApiError(response, "Could not delete application."));
-      setSelected((current) => (current?.id === card.id ? null : current));
+      setSelectedId((current) => {
+        if (current === card.id) {
+          replacePipelineAppQuery(null);
+          return null;
+        }
+        return current;
+      });
       toast.success("Application deleted", {
         action: {
           label: "Undo",
@@ -336,7 +378,10 @@ export const KanbanBoard = () => {
                   cards={cardList}
                   isOver={overColumn === status}
                   activeCardId={activeId}
-                  onSelectCard={setSelected}
+                  onSelectCard={(card) => {
+                    setSelectedId(card.id);
+                    replacePipelineAppQuery(card.id);
+                  }}
                   onDeleteCard={(card) => {
                     void handleDeleteCard(card);
                   }}
@@ -379,7 +424,25 @@ export const KanbanBoard = () => {
       <p aria-live="polite" className="sr-only">
         {liveMessage}
       </p>
-      <KanbanCardModal card={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} />
+      <ApplicationDrawer
+        application={selectedId ? applicationsById[selectedId] ?? null : null}
+        open={Boolean(selectedId)}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedId(null);
+            replacePipelineAppQuery(null);
+          }
+        }}
+        onUpdated={(app) => {
+          addOrUpdateFromApplication(app);
+          setApplicationRecord(app);
+        }}
+        onDeleted={(id) => {
+          removeById(id);
+          setSelectedId(null);
+          replacePipelineAppQuery(null);
+        }}
+      />
     </>
   );
 };

@@ -15,12 +15,15 @@ export type ChatMessage = {
   timestamp: string;
 };
 
+export type ChatPanelState = "closed" | "minimized" | "open";
+
 type ChatState = {
   messages: ChatMessage[];
-  isOpen: boolean;
+  panelState: ChatPanelState;
   isLoading: boolean;
   toggle: () => void;
   open: () => void;
+  minimize: () => void;
   close: () => void;
   addMessage: (
     role: ChatMessage["role"],
@@ -38,11 +41,18 @@ const uid = (): string =>
 
 export const useChatStore = create<ChatState>()((set) => ({
   messages: [],
-  isOpen: false,
+  panelState: "closed",
   isLoading: false,
-  toggle: () => set((s) => ({ isOpen: !s.isOpen })),
-  open: () => set({ isOpen: true }),
-  close: () => set({ isOpen: false }),
+  toggle: () =>
+    set((s) => {
+      if (s.panelState === "closed") return { panelState: "open" };
+      if (s.panelState === "open") return { panelState: "closed" };
+      if (s.panelState === "minimized") return { panelState: "open" };
+      return s;
+    }),
+  open: () => set({ panelState: "open" }),
+  minimize: () => set({ panelState: "minimized" }),
+  close: () => set({ panelState: "closed" }),
   addMessage: (role, content, actions) =>
     set((s) => ({
       messages: [

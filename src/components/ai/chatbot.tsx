@@ -3,30 +3,45 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { X, Send, Trash2, Minus } from "lucide-react";
+import { X, Send, Trash2, Minus, ChevronUp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useKanbanStore, type StatusId } from "@/stores/kanban-store";
-import { useChatStore } from "@/stores/chat-store";
+import { useChatStore, type ChatMessage } from "@/stores/chat-store";
 import { dispatchOpenAddApplication } from "@/lib/events";
-import { IconFrame, SparkGlyph } from "@/components/ui/icons/premium-icons";
+import { AssistantChatIcon } from "@/components/ui/assistant-chat-icon";
+
+/** Text to show in minimized preview: prefer last assistant reply, else last user message. */
+function peekPreview(messages: ChatMessage[], isLoading: boolean): string {
+  if (isLoading) return "";
+  const rev = [...messages].reverse();
+  const lastAssistant = rev.find((m) => m.role === "assistant");
+  if (lastAssistant) return lastAssistant.content;
+  const lastUser = rev.find((m) => m.role === "user");
+  if (lastUser) return lastUser.content;
+  return "";
+}
 
 const PAGE_ROUTES: Record<string, string> = {
   overview: "/dashboard",
-  tracker: "/dashboard/tracker",
-  profile: "/dashboard/profile",
-  analyze: "/dashboard/analyze",
-  email: "/dashboard/email",
-  automation: "/dashboard/automation",
-  "interview-prep": "/dashboard/interview-prep",
-  "cover-letter": "/dashboard/cover-letter",
-  "resume-tailor": "/dashboard/resume-tailor",
+  pipeline: "/dashboard/pipeline",
+  /** @deprecated use pipeline */
+  tracker: "/dashboard/pipeline",
+  insights: "/dashboard/insights",
+  settings: "/dashboard/settings",
+  profile: "/dashboard/settings?section=profile",
+  analyze: "/dashboard/pipeline",
+  email: "/dashboard/pipeline",
+  automation: "/dashboard/settings?section=integrations",
+  "interview-prep": "/dashboard/pipeline",
+  "cover-letter": "/dashboard/pipeline",
+  "resume-tailor": "/dashboard/pipeline",
 };
 
 const QUICK_ACTIONS = [
   { label: "Show my stats", message: "How many applications do I have and what's the breakdown?" },
-  { label: "Go to Tracker", message: "Take me to the application tracker" },
+  { label: "Open Pipeline", message: "Take me to my application pipeline" },
   { label: "Add Application", message: "I want to add a new application" },
-  { label: "Analyze Resume", message: "Help me analyze my resume against a job posting" },
+  { label: "Analyze a job fit", message: "Help me analyze my resume against a job — I'll open an application from the pipeline" },
 ];
 
 const TypingIndicator = () => (
@@ -76,28 +91,46 @@ export const Chatbot = () => {
   const { cards, columns, setSearch, setFilter } = useKanbanStore();
   const {
     messages,
-    isOpen,
+    panelState,
     isLoading,
     toggle,
+    open,
+    minimize,
     close,
     addMessage,
     setLoading,
     clearMessages,
   } = useChatStore();
+  const isOpen = panelState === "open";
+  const isMinimized = panelState === "minimized";
   const [input, setInput] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const minimizedInputRef = useRef<HTMLTextAreaElement>(null);
+  const minimizedPreviewRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isLoading]);
 
   useEffect(() => {
-    if (isOpen) {
+    if (!isMinimized) return;
+    minimizedPreviewRef.current?.scrollTo({
+      top: minimizedPreviewRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, isLoading, isMinimized]);
+
+  useEffect(() => {
+    if (panelState === "open") {
       const t = setTimeout(() => inputRef.current?.focus(), 150);
       return () => clearTimeout(t);
     }
-  }, [isOpen]);
+    if (panelState === "minimized") {
+      const t = setTimeout(() => minimizedInputRef.current?.focus(), 150);
+      return () => clearTimeout(t);
+    }
+  }, [panelState]);
 
   const buildContext = useCallback(() => {
     const allCards = Object.values(cards);
@@ -220,7 +253,7 @@ export const Chatbot = () => {
               setSearch(action.payload.search);
             if (typeof action.payload.status_filter === "string")
               setFilter(action.payload.status_filter);
-            router.push("/dashboard/tracker");
+            router.push("/dashboard/pipeline");
             break;
           }
         }
@@ -286,23 +319,121 @@ export const Chatbot = () => {
     }
   };
 
+  const minimizedPreviewText = peekPreview(messages, false);
+
   return (
     <>
       {/* Floating bubble */}
       <motion.button
         onClick={toggle}
-        aria-label="Toggle AI assistant"
+        aria-label="Open AI assistant"
         className="fixed bottom-6 right-6 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg hover:shadow-glow-md transition-all"
-        animate={{ scale: isOpen ? 0 : 1, opacity: isOpen ? 0 : 1 }}
+        animate={{
+          scale: panelState === "closed" ? 1 : 0,
+          opacity: panelState === "closed" ? 1 : 0,
+        }}
         whileHover={{ scale: 1.12, y: -2 }}
         whileTap={{ scale: 0.92 }}
         transition={{ type: "spring", stiffness: 400, damping: 25 }}
-        style={{ pointerEvents: isOpen ? "none" : "auto" }}
+        style={{ pointerEvents: panelState === "closed" ? "auto" : "none" }}
       >
-        <IconFrame className="h-7 w-7 rounded-full border-none bg-transparent shadow-none">
-          <SparkGlyph />
-        </IconFrame>
+        <AssistantChatIcon className="h-8 w-8" />
       </motion.button>
+
+      {/* Minimized: last message preview + inline composer */}
+      <AnimatePresence>
+        {isMinimized && (
+          <motion.div
+            initial={{ opacity: 0, y: 16, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 16, scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 380, damping: 28 }}
+            className="fixed bottom-6 right-6 z-50 flex w-[min(420px,calc(100vw-2rem))] flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/[0.07] shadow-glow-md backdrop-blur-xl"
+          >
+            <div className="flex items-center justify-between gap-2 border-b border-white/10 px-3 py-2">
+              <div className="flex min-w-0 items-center gap-2">
+                <AssistantChatIcon className="h-5 w-5 shrink-0" />
+                <span className="truncate font-display text-sm">InternIQ AI</span>
+              </div>
+              <div className="flex shrink-0 items-center gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => open()}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                  aria-label="Expand chat"
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => close()}
+                  className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground"
+                  aria-label="Close chat"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div
+              ref={minimizedPreviewRef}
+              className="max-h-40 min-h-[3.5rem] overflow-y-auto px-3 py-2"
+            >
+              {minimizedPreviewText ? (
+                <p className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/90">
+                  {minimizedPreviewText}
+                </p>
+              ) : !isLoading ? (
+                <p className="text-[13px] leading-relaxed text-muted-foreground">
+                  No messages yet. Type below to start, or expand for the full chat.
+                </p>
+              ) : null}
+              {isLoading && (
+                <div
+                  className={cn(
+                    minimizedPreviewText && "mt-2 border-t border-white/5 pt-2",
+                  )}
+                >
+                  <TypingIndicator />
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-white/10 p-2">
+              <div className="flex items-end gap-2">
+                <textarea
+                  ref={minimizedInputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Message\u2026"
+                  rows={2}
+                  className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm outline-none placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/20"
+                  style={{ maxHeight: 96 }}
+                />
+                <motion.button
+                  type="button"
+                  onClick={() => send(input)}
+                  disabled={!input.trim() || isLoading}
+                  whileHover={
+                    input.trim() && !isLoading ? { scale: 1.05 } : {}
+                  }
+                  whileTap={input.trim() && !isLoading ? { scale: 0.95 } : {}}
+                  className={cn(
+                    "flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition-colors",
+                    input.trim() && !isLoading
+                      ? "bg-primary text-primary-foreground hover:bg-primary/90"
+                      : "bg-white/5 text-muted-foreground cursor-not-allowed"
+                  )}
+                  aria-label="Send message"
+                >
+                  <Send className="h-4 w-4" />
+                </motion.button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Chat panel */}
       <AnimatePresence>
@@ -317,9 +448,7 @@ export const Chatbot = () => {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <div className="flex items-center gap-2">
-                <IconFrame className="h-6 w-6 rounded-md">
-                  <SparkGlyph />
-                </IconFrame>
+                <AssistantChatIcon className="h-6 w-6" />
                 <span className="font-display text-sm">InternIQ AI</span>
               </div>
               <div className="flex items-center gap-1">
@@ -331,16 +460,16 @@ export const Chatbot = () => {
                   <Trash2 className="h-3.5 w-3.5" />
                 </button>
                 <button
-                  onClick={close}
+                  onClick={minimize}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors"
-                  aria-label="Minimize"
+                  aria-label="Minimize chat"
                 >
                   <Minus className="h-3.5 w-3.5" />
                 </button>
                 <button
                   onClick={close}
                   className="rounded-lg p-1.5 text-muted-foreground hover:bg-white/10 hover:text-foreground transition-colors"
-                  aria-label="Close"
+                  aria-label="Close chat"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -355,9 +484,9 @@ export const Chatbot = () => {
                   animate={{ opacity: 1 }}
                   className="flex flex-col items-center justify-center h-full text-center px-2"
                 >
-                  <IconFrame className="h-12 w-12 rounded-xl mb-3">
-                    <SparkGlyph className="h-6 w-6" />
-                  </IconFrame>
+                  <div className="mb-3 flex justify-center">
+                    <AssistantChatIcon className="h-14 w-14" />
+                  </div>
                   <p className="text-sm font-medium mb-1">
                     Hey! I&apos;m your AI assistant.
                   </p>

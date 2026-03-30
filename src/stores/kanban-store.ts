@@ -31,12 +31,15 @@ interface ColumnData {
 interface KanbanState {
   columns: Record<StatusId, ColumnData>;
   cards: Record<string, KanbanCardData>;
+  /** Full rows from last API hydrate — not persisted; used for Application Drawer */
+  applicationsById: Record<string, Application>;
   isHydrated: boolean;
   search: string;
   filter: string | null;
   restoreBoard: (columns: Record<StatusId, ColumnData>, cards: Record<string, KanbanCardData>) => void;
   hydrateFromApplications: (applications: Application[]) => void;
   addOrUpdateFromApplication: (application: Application) => void;
+  setApplicationRecord: (application: Application) => void;
   removeById: (id: string) => void;
   moveCard: (cardId: string, from: StatusId, to: StatusId, newIndex: number) => void;
   reorderCard: (cardId: string, column: StatusId, newIndex: number) => void;
@@ -68,10 +71,15 @@ export const useKanbanStore = create<KanbanState>()(
     (set) => ({
       columns: columnsSeed,
       cards: {},
+      applicationsById: {},
       isHydrated: false,
       search: "",
       filter: null,
       restoreBoard: (columns, cards) => set({ columns, cards }),
+      setApplicationRecord: (application) =>
+        set((state) => ({
+          applicationsById: { ...state.applicationsById, [application.id]: application },
+        })),
       setSearch: (search) => set({ search }),
       setFilter: (filter) => set({ filter }),
       setCardNotes: (id, notes) =>
@@ -90,6 +98,7 @@ export const useKanbanStore = create<KanbanState>()(
         }),
       hydrateFromApplications: (applications) =>
         set(() => {
+          const applicationsById: Record<string, Application> = {};
           const cards: Record<string, KanbanCardData> = {};
           const nextColumns: Record<StatusId, ColumnData> = {
             ...columnsSeed,
@@ -101,6 +110,7 @@ export const useKanbanStore = create<KanbanState>()(
           };
 
           for (const app of applications) {
+            applicationsById[app.id] = app;
             cards[app.id] = {
               id: app.id,
               company: app.company,
@@ -122,6 +132,7 @@ export const useKanbanStore = create<KanbanState>()(
           return {
             cards,
             columns: nextColumns,
+            applicationsById,
             isHydrated: true,
           };
         }),
@@ -148,6 +159,10 @@ export const useKanbanStore = create<KanbanState>()(
 
           return {
             columns: nextColumns,
+            applicationsById: {
+              ...state.applicationsById,
+              [application.id]: application,
+            },
             cards: {
               ...state.cards,
               [application.id]: {
@@ -171,6 +186,8 @@ export const useKanbanStore = create<KanbanState>()(
         set((state) => {
           const nextCards = { ...state.cards };
           delete nextCards[id];
+          const nextApps = { ...state.applicationsById };
+          delete nextApps[id];
           const nextColumns = { ...state.columns };
           for (const status of Object.keys(nextColumns) as StatusId[]) {
             nextColumns[status] = {
@@ -178,7 +195,7 @@ export const useKanbanStore = create<KanbanState>()(
               cardIds: nextColumns[status].cardIds.filter((cardId) => cardId !== id),
             };
           }
-          return { cards: nextCards, columns: nextColumns };
+          return { cards: nextCards, columns: nextColumns, applicationsById: nextApps };
         }),
       moveCard: (cardId, from, to, newIndex) =>
         set((state) => {
@@ -237,6 +254,7 @@ export const useKanbanStore = create<KanbanState>()(
           ...state,
           columns: safeColumns,
           cards: safeCards,
+          applicationsById: {},
         } as KanbanState;
       },
       partialize: (state) => ({

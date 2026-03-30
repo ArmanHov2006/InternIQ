@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { EmailConnectionRecord, GmailMessageEnvelope } from "@/lib/services/email-ingestion/types";
+import { decryptTokenIfEncrypted, encryptToken } from "@/lib/crypto";
 
 const GOOGLE_OAUTH_TOKEN_ENDPOINT = "https://oauth2.googleapis.com/token";
 const GMAIL_API_BASE = "https://gmail.googleapis.com/gmail/v1/users/me";
@@ -20,7 +21,8 @@ export const refreshGmailAccessToken = async (
   supabaseAdmin: SupabaseClient
 ): Promise<string> => {
   const { clientId, clientSecret } = getRequiredGoogleEnv();
-  if (!connection.refresh_token) {
+  const refreshTokenPlain = decryptTokenIfEncrypted(connection.refresh_token);
+  if (!refreshTokenPlain) {
     throw new Error("Missing Gmail refresh token.");
   }
 
@@ -28,7 +30,7 @@ export const refreshGmailAccessToken = async (
     client_id: clientId,
     client_secret: clientSecret,
     grant_type: "refresh_token",
-    refresh_token: connection.refresh_token,
+    refresh_token: refreshTokenPlain,
   });
 
   const response = await fetch(GOOGLE_OAUTH_TOKEN_ENDPOINT, {
@@ -50,7 +52,7 @@ export const refreshGmailAccessToken = async (
   const { error } = await supabaseAdmin
     .from("email_connections")
     .update({
-      access_token: payload.access_token,
+      access_token: encryptToken(payload.access_token),
       access_token_expires_at: expiresAt,
       is_active: true,
     })
@@ -69,8 +71,9 @@ const ensureActiveToken = async (
   connection: EmailConnectionRecord,
   supabaseAdmin: SupabaseClient
 ): Promise<string> => {
-  if (!isTokenStale(connection) && connection.access_token) {
-    return connection.access_token;
+  const accessPlain = decryptTokenIfEncrypted(connection.access_token);
+  if (!isTokenStale(connection) && accessPlain) {
+    return accessPlain;
   }
   return refreshGmailAccessToken(connection, supabaseAdmin);
 };

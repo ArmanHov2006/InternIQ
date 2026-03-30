@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import Anthropic from "@anthropic-ai/sdk";
+import { checkAiRateLimit } from "@/lib/rate-limit";
 
 type ChatRequestBody = {
   messages?: { role: string; content: string }[];
@@ -213,12 +214,15 @@ async function callClaudeDirect(
         if (block.type === "text") {
           return { type: "text" as const, text: block.text };
         }
-        return {
-          type: "tool_use" as const,
-          id: block.id,
-          name: (block as Anthropic.ToolUseBlock).name,
-          input: (block as Anthropic.ToolUseBlock).input,
-        };
+        if (block.type === "tool_use") {
+          return {
+            type: "tool_use" as const,
+            id: block.id,
+            name: block.name,
+            input: block.input,
+          };
+        }
+        return { type: "text" as const, text: "" };
       }
     );
 
@@ -358,6 +362,54 @@ function extractApplicationDetails(msg: string) {
   return { company, role, location, pay };
 }
 
+function extractAddWithStatus(msg: string): {
+  company: string;
+  role: string;
+  status: string;
+  location: string;
+  notes: string;
+} | null {
+  const m = msg.match(
+    /\badd\b.*?\b(?:application|app)?\s*(?:towards?|to|for|in|at|under)\s+(\w+)\s*(?:stage|status|column)?\s*(?:for|at|from|with)?\s*(.*)?$/i
+  );
+  if (!m) return null;
+
+  const rawStatus = m[1]?.toLowerCase() || "";
+  const rest = (m[2] || "").trim();
+
+  const statusMap: Record<string, string> = {
+    saved: "saved",
+    applied: "applied",
+    interview: "interview",
+    interviewing: "interview",
+    offer: "offer",
+    rejected: "rejected",
+  };
+  const status = statusMap[rawStatus];
+  if (!status) return null;
+
+  let company = "";
+  let role = "";
+  let location = "";
+  if (rest) {
+    const parts = rest.match(/^(.+?)(?:\s+(?:for|as)\s+(.+?))?(?:\s+(?:at|in)\s+(.+?))?$/i);
+    if (parts) {
+      company = parts[1]?.trim() || "";
+      role = parts[2]?.trim() || "";
+      location = parts[3]?.trim() || "";
+    } else {
+      company = rest;
+    }
+  }
+
+  const titleCase = (s: string) => s.replace(/\b\w/g, (c) => c.toUpperCase());
+  company = titleCase(company);
+  role = titleCase(role);
+  location = titleCase(location);
+
+  return { company, role: role || "General Application", status, location, notes: "" };
+}
+
 function handleLocalChat(msg: string, context: Record<string, unknown>) {
   const appTriggers =
     /\b(applied|applying|submitted|add|track|got\s+(?:an?\s+)?(?:offer|interview)|interviewing?|rejected|heard\s+back|saving|interested\s+in)\s+(?:to|at|from|with|for|by)\s+/i;
@@ -394,6 +446,33 @@ function handleLocalChat(msg: string, context: Record<string, unknown>) {
         ],
       };
     }
+  }
+
+  const statusAdd = extractAddWithStatus(msg);
+  if (statusAdd) {
+    if (statusAdd.company) {
+      const details = [
+        `Company: **${statusAdd.company}**`,
+        `Role: **${statusAdd.role}**`,
+        `Status: **${statusAdd.status}**`,
+        statusAdd.location ? `Location: ${statusAdd.location}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n");
+
+      return {
+        reply: `Added your application!\n\n${details}`,
+        actions: [
+          { type: "add_application", payload: statusAdd },
+        ],
+      };
+    }
+    return {
+      reply: "Opening the Add Application dialog — set the status to **" +
+        statusAdd.status.charAt(0).toUpperCase() + statusAdd.status.slice(1) +
+        "** when you fill it in!",
+      actions: [{ type: "open_add_dialog", payload: {} }],
+    };
   }
 
   for (const [keyword, target] of Object.entries(PAGE_KEYWORDS)) {
@@ -485,8 +564,13 @@ export async function POST(request: Request) {
     }
 
     let accessToken: string | null = null;
+    let userId: string | null = null;
     try {
       const supabase = createClient();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      userId = user?.id ?? null;
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -494,6 +578,9 @@ export async function POST(request: Request) {
     } catch {
       // Auth unavailable
     }
+
+    const rateLimited = checkAiRateLimit(request, userId);
+    if (rateLimited) return rateLimited;
 
     const fastApiUrl =
       process.env.NEXT_PUBLIC_FASTAPI_URL || process.env.FASTAPI_URL;

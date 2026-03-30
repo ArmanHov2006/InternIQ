@@ -6,10 +6,10 @@ import { ArrowNudgeIcon, BrandMarkIcon, IconFrame } from "@/components/ui/icons/
 import { Twitter, Github, Linkedin, Mail } from "lucide-react";
 
 const productLinks = [
-  { label: "Tracker", href: "/dashboard/tracker" },
-  { label: "Portfolio", href: "/dashboard/profile" },
-  { label: "AI Tools", href: "/dashboard/analyze" },
-  { label: "Analytics", href: "/dashboard" },
+  { label: "Pipeline", href: "/dashboard/pipeline" },
+  { label: "Settings", href: "/dashboard/settings" },
+  { label: "Insights", href: "/dashboard/insights" },
+  { label: "Dashboard", href: "/dashboard" },
 ];
 
 const resourceLinks = [

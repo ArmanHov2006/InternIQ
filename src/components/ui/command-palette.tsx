@@ -10,14 +10,10 @@ import { dispatchOpenAddApplication } from "@/lib/events";
 import { useChatStore } from "@/stores/chat-store";
 
 const navItems = [
-  { label: "Overview", href: "/dashboard" },
-  { label: "Tracker", href: "/dashboard/tracker" },
-  { label: "Profile", href: "/dashboard/profile" },
-  { label: "AI Analyzer", href: "/dashboard/analyze" },
-  { label: "Cold Email", href: "/dashboard/email" },
-  { label: "Interview Prep", href: "/dashboard/interview-prep" },
-  { label: "Cover Letter", href: "/dashboard/cover-letter" },
-  { label: "Resume Tailor", href: "/dashboard/resume-tailor" },
+  { label: "Dashboard", href: "/dashboard" },
+  { label: "Pipeline", href: "/dashboard/pipeline" },
+  { label: "Insights", href: "/dashboard/insights" },
+  { label: "Settings", href: "/dashboard/settings" },
 ];
 
 export const CommandPalette = () => {
@@ -78,12 +74,17 @@ export const CommandPalette = () => {
           return;
         }
         if (key === "t") {
-          router.push("/dashboard/tracker");
+          router.push("/dashboard/pipeline");
           setSequence("");
           return;
         }
-        if (key === "p") {
-          router.push("/dashboard/profile");
+        if (key === "i") {
+          router.push("/dashboard/insights");
+          setSequence("");
+          return;
+        }
+        if (key === "s") {
+          router.push("/dashboard/settings");
           setSequence("");
           return;
         }
@@ -179,7 +180,7 @@ export const CommandPalette = () => {
                 <span className="mr-3">Ctrl/Cmd+K open</span>
                 <span className="mr-3">Ctrl/Cmd+J chat</span>
                 <span className="mr-3">C quick add</span>
-                <span className="mr-3">G then D/T/P jump</span>
+                <span className="mr-3">G then D/T/I/S jump</span>
                 <span>? shortcuts</span>
               </div>
             </Command>

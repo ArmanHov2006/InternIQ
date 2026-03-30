@@ -51,7 +51,7 @@ const testimonials = [
   },
 ];
 
-const TestimonialCard = ({ testimonial, index }: { testimonial: typeof testimonials[0]; index: number }) => (
+const TestimonialCard = ({ testimonial }: { testimonial: (typeof testimonials)[0] }) => (
   <motion.div
     whileHover={{ y: -4, scale: 1.02 }}
     transition={{ type: "spring", stiffness: 400, damping: 25 }}
@@ -128,7 +128,7 @@ export const TestimonialsSection = () => {
             transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
           >
             {marqueeTop.map((testimonial, index) => (
-              <TestimonialCard key={`top-${index}`} testimonial={testimonial} index={index} />
+              <TestimonialCard key={`top-${index}`} testimonial={testimonial} />
             ))}
           </motion.div>
         </div>
@@ -143,7 +143,7 @@ export const TestimonialsSection = () => {
             transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
           >
             {marqueeBottom.map((testimonial, index) => (
-              <TestimonialCard key={`bottom-${index}`} testimonial={testimonial} index={index} />
+              <TestimonialCard key={`bottom-${index}`} testimonial={testimonial} />
             ))}
           </motion.div>
         </div>

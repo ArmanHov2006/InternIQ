@@ -3,10 +3,10 @@ let workerConfigured = false;
 async function configurePdfWorker() {
   if (workerConfigured) return;
   const pdfjsLib = await import("pdfjs-dist");
-  pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.mjs",
-    import.meta.url
-  ).toString();
+  // Do not use `new URL(..., import.meta.url)` here: webpack bundles the worker into
+  // the client chunk and Terser fails on `import.meta` inside pdf.worker.min.mjs.
+  const v = pdfjsLib.version ?? "5.5.207";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${v}/build/pdf.worker.min.mjs`;
   workerConfigured = true;
 }
 

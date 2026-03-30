@@ -10,72 +10,17 @@ import { ArrowNudgeIcon } from "@/components/ui/icons/premium-icons";
 import { Sparkles, TrendingUp, Users, Zap } from "lucide-react";
 
 const HeroVisual = () => (
-  <div className="relative h-[420px] w-full overflow-visible">
+  <div id="hero-demo" className="relative flex h-[520px] w-full items-center justify-center">
     {/* Ambient glow */}
     <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/30 blur-[100px]" />
-    <div className="absolute left-1/4 top-1/3 h-48 w-48 rounded-full bg-accent/25 blur-[80px] animate-pulse" />
-    <div className="absolute right-1/4 bottom-1/4 h-40 w-40 rounded-full bg-accent-cyan/20 blur-[70px]" />
-    
-    {/* Main 3D card composition */}
-    <motion.div
-      animate={{ 
-        rotateY: [0, 6, -6, 0], 
-        rotateX: [0, 4, -4, 0], 
-      }}
-      transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-      className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 [transform-style:preserve-3d] [perspective:1200px]"
-    >
-      {/* Back card */}
-      <motion.div 
-        animate={{ y: [0, -6, 0], rotateZ: [-3, -2, -3] }}
-        transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-        className="absolute -right-16 -top-12 h-44 w-64 rounded-2xl border border-accent-cyan/30 bg-gradient-to-br from-accent-cyan/15 to-accent-cyan/5 backdrop-blur-xl shadow-glow-sm"
-      >
-        <div className="p-4">
-          <div className="flex items-center gap-2 text-accent-cyan">
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-xs font-medium">Response Rate</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gradient">+89%</p>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
-            <motion.div 
-              initial={{ width: 0 }}
-              animate={{ width: "89%" }}
-              transition={{ duration: 2, delay: 0.5 }}
-              className="h-full rounded-full bg-gradient-to-r from-accent-cyan to-accent"
-            />
-          </div>
-        </div>
-      </motion.div>
-      
-      {/* Middle card */}
-      <motion.div 
-        animate={{ y: [0, 5, 0], rotateZ: [2, 3, 2] }}
-        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-        className="absolute -bottom-8 -left-14 h-36 w-56 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 to-accent/5 backdrop-blur-xl shadow-glow-sm"
-      >
-        <div className="p-4">
-          <div className="flex items-center gap-2 text-accent">
-            <Users className="h-4 w-4" />
-            <span className="text-xs font-medium">Active Users</span>
-          </div>
-          <p className="mt-2 text-xl font-bold">12,847</p>
-          <div className="mt-2 flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 8 }}
-                animate={{ height: [8, 16 + i * 4, 8] }}
-                transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
-                className="w-2 rounded-full bg-accent/60"
-              />
-            ))}
-          </div>
-        </div>
-      </motion.div>
-      
+
+    <div className="relative flex w-full max-w-md flex-col items-center gap-5">
       {/* Main card */}
-      <div className="relative h-64 w-80 rounded-2xl border border-white/15 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl shadow-glow-md">
+      <motion.div
+        animate={{ rotateY: [0, 3, -3, 0], rotateX: [0, 2, -2, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="relative w-full rounded-2xl border border-white/15 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl shadow-glow-md [perspective:1200px]"
+      >
         <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_30%_20%,oklch(0.65_0.25_265_/_15%),transparent_50%)]" />
         <div className="relative p-5">
           <div className="flex items-center justify-between">
@@ -87,7 +32,7 @@ const HeroVisual = () => (
             </div>
             <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">Live</span>
           </div>
-          
+
           <div className="mt-5 space-y-3">
             {["Applied to Google", "Interview at Meta", "Offer from Stripe"].map((item, i) => (
               <motion.div
@@ -104,8 +49,54 @@ const HeroVisual = () => (
             ))}
           </div>
         </div>
+      </motion.div>
+
+      {/* Stat cards row — stacked below, not overlapping */}
+      <div className="flex w-full gap-4">
+        <motion.div
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+          className="flex-1 rounded-2xl border border-accent-cyan/30 bg-gradient-to-br from-accent-cyan/15 to-accent-cyan/5 backdrop-blur-xl p-4"
+        >
+          <div className="flex items-center gap-2 text-accent-cyan">
+            <TrendingUp className="h-4 w-4" />
+            <span className="text-xs font-medium">Response Rate</span>
+          </div>
+          <p className="mt-2 text-2xl font-bold text-gradient">+89%</p>
+          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              initial={{ width: 0 }}
+              animate={{ width: "89%" }}
+              transition={{ duration: 2, delay: 0.5 }}
+              className="h-full rounded-full bg-gradient-to-r from-accent-cyan to-accent"
+            />
+          </div>
+        </motion.div>
+
+        <motion.div
+          animate={{ y: [0, 4, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
+          className="flex-1 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 to-accent/5 backdrop-blur-xl p-4"
+        >
+          <div className="flex items-center gap-2 text-accent">
+            <Users className="h-4 w-4" />
+            <span className="text-xs font-medium">Active Users</span>
+          </div>
+          <p className="mt-2 text-xl font-bold">12,847</p>
+          <div className="mt-2 flex gap-1">
+            {[...Array(5)].map((_, i) => (
+              <motion.div
+                key={i}
+                initial={{ height: 8 }}
+                animate={{ height: [8, 16 + i * 4, 8] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
+                className="w-2 rounded-full bg-accent/60"
+              />
+            ))}
+          </div>
+        </motion.div>
       </div>
-    </motion.div>
+    </div>
   </div>
 );
 
