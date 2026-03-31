@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 import { parseProofPackArtifact } from "@/lib/services/career-os";
 import type {
   Application,
@@ -244,7 +245,7 @@ export function ApplicationCommandCenter({ application }: Props) {
         ) : (
           <ul className="mt-4 space-y-3">
             {timeline.slice(0, 8).map((event) => (
-              <li key={event.id} className="rounded-xl border border-white/[0.04] bg-card p-3">
+              <li key={event.id} className="rounded-xl border border-border bg-card p-3">
                 <div className="flex items-center justify-between gap-2">
                   <p className="text-sm font-medium">{event.title}</p>
                   <Badge variant="outline">{event.event_type}</Badge>
@@ -252,7 +253,7 @@ export function ApplicationCommandCenter({ application }: Props) {
                 {event.description ? (
                   <p className="mt-1 text-xs text-muted-foreground">{event.description}</p>
                 ) : null}
-                <p className="mt-2 text-[11px] text-muted-foreground">
+                <p className="mt-2 font-mono text-[11px] text-muted-foreground">
                   {new Date(event.occurred_at).toLocaleString()}
                 </p>
               </li>
@@ -302,7 +303,7 @@ export function ApplicationCommandCenter({ application }: Props) {
         {contacts.length > 0 ? (
           <ul className="mt-4 space-y-2">
             {contacts.map((contact) => (
-              <li key={contact.id} className="rounded-xl border border-white/[0.04] bg-card px-3 py-2">
+              <li key={contact.id} className="rounded-xl border border-border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium">{contact.name}</p>
@@ -366,11 +367,11 @@ export function ApplicationCommandCenter({ application }: Props) {
         {interviews.length > 0 ? (
           <ul className="mt-4 space-y-2">
             {interviews.map((interview) => (
-              <li key={interview.id} className="rounded-xl border border-white/[0.04] bg-card px-3 py-2">
+              <li key={interview.id} className="rounded-xl border border-border bg-card px-3 py-2">
                 <div className="flex items-center justify-between gap-2">
                   <div>
                     <p className="text-sm font-medium">{interview.title}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-mono text-xs text-muted-foreground">
                       {new Date(interview.scheduled_at).toLocaleString()}
                     </p>
                   </div>
@@ -382,7 +383,7 @@ export function ApplicationCommandCenter({ application }: Props) {
         ) : null}
       </GlassCard>
 
-      <GlassCard className="p-4" tiltEnabled={false}>
+      <GlassCard className={cn("p-4", generatingProofPack && "animate-glow-pulse shadow-glow-xs")} tiltEnabled={false}>
         <div className="flex items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
           <h3 className="text-sm font-semibold">Proof pack</h3>
@@ -396,7 +397,7 @@ export function ApplicationCommandCenter({ application }: Props) {
         </Button>
 
         {parsedProofPack ? (
-          <div className="mt-4 space-y-3 rounded-xl border border-white/[0.04] bg-card p-4">
+          <div className="mt-4 space-y-3 rounded-xl border border-border bg-card p-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant="secondary">Recruiter ready</Badge>
               {latestProofPack?.share_slug ? (
@@ -414,7 +415,7 @@ export function ApplicationCommandCenter({ application }: Props) {
             {parsedProofPack.evidenceBullets?.length ? (
               <ul className="space-y-2 text-xs text-muted-foreground">
                 {parsedProofPack.evidenceBullets.map((bullet) => (
-                  <li key={bullet} className="rounded-lg border border-white/[0.04] px-3 py-2">
+                  <li key={bullet} className="rounded-lg border border-border px-3 py-2">
                     {bullet}
                   </li>
                 ))}

@@ -9,6 +9,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 const listDemoContacts = (applicationId: string): ApplicationContact[] =>
   Array.from(demoContactStore.values())
@@ -41,7 +42,12 @@ export async function GET(request: Request) {
       .eq("application_id", applicationId)
       .order("updated_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        return NextResponse.json(listDemoContacts(applicationId));
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json((data ?? []) as ApplicationContact[]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
@@ -130,7 +136,46 @@ export async function POST(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const now = new Date().toISOString();
+        const contact: ApplicationContact = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          application_id: applicationId,
+          name,
+          email: typeof body.email === "string" ? body.email : "",
+          title: typeof body.title === "string" ? body.title : "",
+          company: typeof body.company === "string" ? body.company : "",
+          relationship_type:
+            body.relationship_type === "referrer" ||
+            body.relationship_type === "hiring_manager" ||
+            body.relationship_type === "interviewer" ||
+            body.relationship_type === "other"
+              ? body.relationship_type
+              : "recruiter",
+          notes: typeof body.notes === "string" ? body.notes : "",
+          last_contacted_at:
+            typeof body.last_contacted_at === "string" ? body.last_contacted_at : null,
+          next_follow_up_at:
+            typeof body.next_follow_up_at === "string" ? body.next_follow_up_at : null,
+          created_at: now,
+          updated_at: now,
+        };
+        demoContactStore.set(contact.id, contact);
+        addDemoTimelineEvent({
+          user_id: user.id,
+          application_id: applicationId,
+          event_type: "contact",
+          title: `Added contact: ${name}`,
+          description: contact.title ? `${contact.title} added to relationship CRM.` : "Relationship contact added.",
+          occurred_at: now,
+          metadata: null,
+        });
+        return NextResponse.json(contact);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     await supabase.from("application_timeline_events").insert({
       user_id: user.id,
@@ -218,7 +263,36 @@ export async function PUT(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const existing = demoContactStore.get(id);
+        if (!existing) return NextResponse.json({ error: "Contact not found." }, { status: 404 });
+        const updated: ApplicationContact = {
+          ...existing,
+          name: typeof body.name === "string" ? body.name : existing.name,
+          email: typeof body.email === "string" ? body.email : existing.email,
+          title: typeof body.title === "string" ? body.title : existing.title,
+          company: typeof body.company === "string" ? body.company : existing.company,
+          relationship_type:
+            body.relationship_type === "referrer" ||
+            body.relationship_type === "hiring_manager" ||
+            body.relationship_type === "interviewer" ||
+            body.relationship_type === "other" ||
+            body.relationship_type === "recruiter"
+              ? body.relationship_type
+              : existing.relationship_type,
+          notes: typeof body.notes === "string" ? body.notes : existing.notes,
+          last_contacted_at:
+            typeof body.last_contacted_at === "string" ? body.last_contacted_at : existing.last_contacted_at,
+          next_follow_up_at:
+            typeof body.next_follow_up_at === "string" ? body.next_follow_up_at : existing.next_follow_up_at,
+          updated_at: new Date().toISOString(),
+        };
+        demoContactStore.set(id, updated);
+        return NextResponse.json(updated);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(data as ApplicationContact);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";

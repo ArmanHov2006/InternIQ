@@ -45,6 +45,14 @@ export const OverviewGlyph = ({ className, ...props }: IconProps) => (
   </svg>
 );
 
+export const OpportunitiesGlyph = ({ className, ...props }: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="none" className={cn("h-4 w-4", className)} {...props}>
+    <rect x="3" y="8" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="1.7" />
+    <path d="M8 8V6a2 2 0 012-2h4a2 2 0 012 2v2" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    <path d="M3 13h18" stroke="currentColor" strokeWidth="1.4" opacity="0.6" />
+  </svg>
+);
+
 export const TrackerGlyph = ({ className, ...props }: IconProps) => (
   <svg viewBox="0 0 24 24" fill="none" className={cn("h-4 w-4", className)} {...props}>
     <path d="M4 7h7M4 12h5M4 17h8M14 7h6M12 12h8M15 17h5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />

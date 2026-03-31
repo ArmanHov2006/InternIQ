@@ -20,6 +20,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 const listDemoArtifacts = (applicationId: string): ApplicationArtifact[] =>
   Array.from(demoArtifactStore.values())
@@ -52,7 +53,12 @@ export async function GET(request: Request) {
       .eq("application_id", applicationId)
       .order("updated_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        return NextResponse.json(listDemoArtifacts(applicationId));
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json((data ?? []) as ApplicationArtifact[]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
@@ -167,13 +173,18 @@ export async function POST(request: Request) {
     if (projectRes.error) return NextResponse.json({ error: projectRes.error.message }, { status: 500 });
     if (experienceRes.error) return NextResponse.json({ error: experienceRes.error.message }, { status: 500 });
     if (resumeRes.error) return NextResponse.json({ error: resumeRes.error.message }, { status: 500 });
-    if (contactRes.error) return NextResponse.json({ error: contactRes.error.message }, { status: 500 });
+    if (contactRes.error && !isSchemaCompatError(contactRes.error)) {
+      return NextResponse.json({ error: contactRes.error.message }, { status: 500 });
+    }
 
     const application = applicationRes.data as Application;
     const profile = (profileRes.data ?? null) as Profile | null;
     const projects = (projectRes.data ?? []) as Project[];
     const experience = (experienceRes.data ?? []) as Experience[];
-    const contacts = (contactRes.data ?? []) as ApplicationContact[];
+    const contacts =
+      contactRes.error && isSchemaCompatError(contactRes.error)
+        ? Array.from(demoContactStore.values()).filter((contact) => contact.application_id === applicationId)
+        : ((contactRes.data ?? []) as ApplicationContact[]);
     const resumes = (resumeRes.data ?? []) as Resume[];
     const primaryResume =
       resumes.find((resume) => resume.is_primary) ?? resumes.find((resume) => resume.parsed_text?.trim()) ?? null;
@@ -191,6 +202,32 @@ export async function POST(request: Request) {
       contacts,
     });
 
+    const buildFallbackArtifactResponse = () => {
+      const now = new Date().toISOString();
+      const artifact: ApplicationArtifact = {
+        id: crypto.randomUUID(),
+        user_id: user.id,
+        application_id: application.id,
+        artifact_type: "proof_pack",
+        title: proofPack.artifactTitle,
+        content: proofPack.packContent,
+        share_slug: proofPack.shareSlug,
+        created_at: now,
+        updated_at: now,
+      };
+      demoArtifactStore.set(artifact.id, artifact);
+      addDemoTimelineEvent({
+        user_id: user.id,
+        application_id: application.id,
+        event_type: "artifact",
+        title: "Proof pack generated",
+        description: "Role-specific recruiter assets were generated.",
+        occurred_at: now,
+        metadata: null,
+      });
+      return NextResponse.json({ artifact, resumeVersion: null });
+    };
+
     const resumeVersionInsert = await supabase
       .from("resume_versions")
       .insert({
@@ -206,6 +243,9 @@ export async function POST(request: Request) {
       .single();
 
     if (resumeVersionInsert.error) {
+      if (isSchemaCompatError(resumeVersionInsert.error)) {
+        return buildFallbackArtifactResponse();
+      }
       return NextResponse.json({ error: resumeVersionInsert.error.message }, { status: 500 });
     }
 
@@ -223,6 +263,9 @@ export async function POST(request: Request) {
       .single();
 
     if (artifactInsert.error) {
+      if (isSchemaCompatError(artifactInsert.error)) {
+        return buildFallbackArtifactResponse();
+      }
       return NextResponse.json({ error: artifactInsert.error.message }, { status: 500 });
     }
 

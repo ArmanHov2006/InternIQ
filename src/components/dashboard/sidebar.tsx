@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BriefcaseBusiness, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,7 @@ import {
   AnalyzerGlyph,
   BrandMarkIcon,
   MoonGlyph,
+  OpportunitiesGlyph,
   OverviewGlyph,
   ProfileGlyph,
   SunGlyph,
@@ -24,7 +25,7 @@ interface SidebarProps {
 
 export const dashboardNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: OverviewGlyph },
-  { href: "/dashboard/opportunities", label: "Opportunities", icon: BriefcaseBusiness },
+  { href: "/dashboard/opportunities", label: "Opportunities", icon: OpportunitiesGlyph },
   { href: "/dashboard/pipeline", label: "Pipeline", icon: TrackerGlyph },
   { href: "/dashboard/insights", label: "Insights", icon: AnalyzerGlyph },
   { href: "/dashboard/settings", label: "Settings", icon: ProfileGlyph },

@@ -14,6 +14,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 const getResumeAndKeywords = async (
   supabase: ReturnType<typeof createClient>,
@@ -68,7 +69,14 @@ export async function GET() {
       .order("match_score", { ascending: false, nullsFirst: false })
       .order("updated_at", { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        return NextResponse.json(
+          Array.from(demoOpportunityStore.values()).sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
+        );
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json((data ?? []) as Opportunity[]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
@@ -215,7 +223,42 @@ export async function POST(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const now = new Date().toISOString();
+        const fallback: Opportunity = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          company,
+          role,
+          location: typeof body.location === "string" ? body.location : "",
+          board,
+          source:
+            body.source === "extension" || body.source === "imported" || body.source === "recommendation"
+              ? body.source
+              : "manual",
+          job_url: typeof body.job_url === "string" ? body.job_url : "",
+          external_job_id: typeof body.external_job_id === "string" ? body.external_job_id : null,
+          salary_range: typeof body.salary_range === "string" ? body.salary_range : "",
+          status:
+            body.status === "saved" || body.status === "applied" || body.status === "archived"
+              ? body.status
+              : "new",
+          employment_type: typeof body.employment_type === "string" ? body.employment_type : "",
+          job_description: jobDescription,
+          match_score: insight.score,
+          match_summary: insight.summary,
+          matched_keywords: insight.matched_keywords,
+          missing_keywords: insight.missing_keywords,
+          application_id: typeof body.application_id === "string" ? body.application_id : null,
+          created_at: now,
+          updated_at: now,
+        };
+        demoOpportunityStore.set(fallback.id, fallback);
+        return NextResponse.json(fallback);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(data as Opportunity);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
@@ -292,6 +335,53 @@ export async function PUT(request: Request) {
       .eq("user_id", user.id)
       .maybeSingle();
     if (existingRes.error) {
+      if (isSchemaCompatError(existingRes.error)) {
+        const existing = demoOpportunityStore.get(id);
+        if (!existing) {
+          return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
+        }
+        const nextDescription =
+          typeof body.job_description === "string" ? body.job_description.trim() : existing.job_description;
+        const fallbackInsight =
+          typeof body.match_score === "number" && typeof body.match_summary === "string"
+            ? {
+                score: body.match_score,
+                summary: body.match_summary,
+                matched_keywords: Array.isArray(body.matched_keywords) ? body.matched_keywords.map(String) : existing.matched_keywords,
+                missing_keywords: Array.isArray(body.missing_keywords) ? body.missing_keywords.map(String) : existing.missing_keywords,
+              }
+            : computeMatchInsight({ jobDescription: nextDescription });
+        const updated: Opportunity = {
+          ...existing,
+          company: typeof body.company === "string" ? body.company : existing.company,
+          role: typeof body.role === "string" ? body.role : existing.role,
+          location: typeof body.location === "string" ? body.location : existing.location,
+          board: typeof body.board === "string" ? body.board : existing.board,
+          source:
+            body.source === "extension" || body.source === "imported" || body.source === "recommendation" || body.source === "manual"
+              ? body.source
+              : existing.source,
+          job_url: typeof body.job_url === "string" ? body.job_url : existing.job_url,
+          external_job_id:
+            typeof body.external_job_id === "string" ? body.external_job_id : existing.external_job_id,
+          salary_range: typeof body.salary_range === "string" ? body.salary_range : existing.salary_range,
+          status:
+            body.status === "new" || body.status === "saved" || body.status === "applied" || body.status === "archived"
+              ? body.status
+              : existing.status,
+          employment_type:
+            typeof body.employment_type === "string" ? body.employment_type : existing.employment_type,
+          job_description: nextDescription,
+          match_score: fallbackInsight.score,
+          match_summary: fallbackInsight.summary,
+          matched_keywords: fallbackInsight.matched_keywords,
+          missing_keywords: fallbackInsight.missing_keywords,
+          application_id: typeof body.application_id === "string" ? body.application_id : existing.application_id,
+          updated_at: new Date().toISOString(),
+        };
+        demoOpportunityStore.set(id, updated);
+        return NextResponse.json(updated);
+      }
       return NextResponse.json({ error: existingRes.error.message }, { status: 500 });
     }
     if (!existingRes.data) {
@@ -344,7 +434,45 @@ export async function PUT(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const existing = demoOpportunityStore.get(id);
+        if (!existing) {
+          return NextResponse.json({ error: "Opportunity not found." }, { status: 404 });
+        }
+        const updated: Opportunity = {
+          ...existing,
+          company: typeof body.company === "string" ? body.company : existing.company,
+          role: typeof body.role === "string" ? body.role : existing.role,
+          location: typeof body.location === "string" ? body.location : existing.location,
+          board: typeof body.board === "string" ? body.board : existing.board,
+          source:
+            body.source === "extension" || body.source === "imported" || body.source === "recommendation" || body.source === "manual"
+              ? body.source
+              : existing.source,
+          job_url: typeof body.job_url === "string" ? body.job_url : existing.job_url,
+          external_job_id:
+            typeof body.external_job_id === "string" ? body.external_job_id : existing.external_job_id,
+          salary_range: typeof body.salary_range === "string" ? body.salary_range : existing.salary_range,
+          status:
+            body.status === "new" || body.status === "saved" || body.status === "applied" || body.status === "archived"
+              ? body.status
+              : existing.status,
+          employment_type:
+            typeof body.employment_type === "string" ? body.employment_type : existing.employment_type,
+          job_description: nextDescription,
+          match_score: insight.score,
+          match_summary: insight.summary,
+          matched_keywords: insight.matched_keywords,
+          missing_keywords: insight.missing_keywords,
+          application_id: typeof body.application_id === "string" ? body.application_id : existing.application_id,
+          updated_at: new Date().toISOString(),
+        };
+        demoOpportunityStore.set(id, updated);
+        return NextResponse.json(updated);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(data as Opportunity);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";

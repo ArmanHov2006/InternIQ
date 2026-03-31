@@ -11,6 +11,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 export async function POST(request: Request) {
   try {
@@ -104,6 +105,33 @@ export async function POST(request: Request) {
       : { data: null, error: null };
 
     if (existingRes.error) {
+      if (isSchemaCompatError(existingRes.error)) {
+        const now = new Date().toISOString();
+        const fallback: Opportunity = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          company,
+          role,
+          location: typeof body.location === "string" ? body.location : "",
+          board,
+          source: "extension",
+          job_url: jobUrl,
+          external_job_id: typeof body.external_job_id === "string" ? body.external_job_id : null,
+          salary_range: typeof body.salary_range === "string" ? body.salary_range : "",
+          status: "new",
+          employment_type: typeof body.employment_type === "string" ? body.employment_type : "",
+          job_description: jobDescription,
+          match_score: insight.score,
+          match_summary: insight.summary,
+          matched_keywords: insight.matched_keywords,
+          missing_keywords: insight.missing_keywords,
+          application_id: null,
+          created_at: now,
+          updated_at: now,
+        };
+        demoOpportunityStore.set(fallback.id, fallback);
+        return NextResponse.json(fallback);
+      }
       return NextResponse.json({ error: existingRes.error.message }, { status: 500 });
     }
 
@@ -132,7 +160,25 @@ export async function POST(request: Request) {
         .eq("user_id", user.id)
         .select("*")
         .single();
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+      if (error) {
+        if (isSchemaCompatError(error)) {
+          const updated: Opportunity = {
+            ...(existingRes.data as Opportunity),
+            board,
+            job_url: jobUrl || existingRes.data.job_url,
+            source: "extension",
+            job_description: jobDescription || existingRes.data.job_description,
+            match_score: insight.score,
+            match_summary: insight.summary,
+            matched_keywords: insight.matched_keywords,
+            missing_keywords: insight.missing_keywords,
+            updated_at: new Date().toISOString(),
+          };
+          demoOpportunityStore.set(updated.id, updated);
+          return NextResponse.json(updated);
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
       return NextResponse.json(data as Opportunity);
     }
 
@@ -159,7 +205,36 @@ export async function POST(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const now = new Date().toISOString();
+        const fallback: Opportunity = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          company,
+          role,
+          location: typeof body.location === "string" ? body.location : "",
+          board,
+          source: "extension",
+          job_url: jobUrl,
+          external_job_id: typeof body.external_job_id === "string" ? body.external_job_id : null,
+          salary_range: typeof body.salary_range === "string" ? body.salary_range : "",
+          status: "new",
+          employment_type: typeof body.employment_type === "string" ? body.employment_type : "",
+          job_description: jobDescription,
+          match_score: insight.score,
+          match_summary: insight.summary,
+          matched_keywords: insight.matched_keywords,
+          missing_keywords: insight.missing_keywords,
+          application_id: null,
+          created_at: now,
+          updated_at: now,
+        };
+        demoOpportunityStore.set(fallback.id, fallback);
+        return NextResponse.json(fallback);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json(data as Opportunity);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";

@@ -243,10 +243,12 @@ export function OpportunityInbox() {
               <Plus className="h-4 w-4" />
               {submitting ? "Adding..." : "Add to inbox"}
             </Button>
-            <Button variant="outline" className="gap-2" onClick={() => void onCaptureWithExtension()} disabled={capturing}>
-              <Wand2 className="h-4 w-4" />
-              {capturing ? "Capturing..." : "Simulate extension capture"}
-            </Button>
+            {process.env.NODE_ENV === "development" ? (
+              <Button variant="outline" className="gap-2" onClick={() => void onCaptureWithExtension()} disabled={capturing}>
+                <Wand2 className="h-4 w-4" />
+                {capturing ? "Capturing..." : "Simulate extension capture"}
+              </Button>
+            ) : null}
           </div>
         </div>
       </GlassCard>
@@ -282,7 +284,7 @@ export function OpportunityInbox() {
                 </div>
                 <div className="rounded-xl border border-primary/20 bg-primary/10 px-3 py-1.5 text-right">
                   <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Match</p>
-                  <p className="text-lg font-semibold">{opportunity.match_score ?? "--"}%</p>
+                  <p className="font-mono text-lg font-semibold tabular-nums">{opportunity.match_score ?? "--"}%</p>
                 </div>
               </div>
 
@@ -290,13 +292,13 @@ export function OpportunityInbox() {
 
               <div className="mt-4 flex flex-wrap gap-2">
                 {opportunity.matched_keywords.slice(0, 4).map((keyword) => (
-                  <Badge key={keyword} variant="secondary" className="bg-emerald-500/10 text-emerald-300">
+                  <Badge key={keyword} variant="secondary" className="bg-primary/10 text-primary">
                     {keyword}
                   </Badge>
                 ))}
                 {opportunity.missing_keywords.slice(0, 2).map((keyword) => (
-                  <Badge key={keyword} variant="outline">
-                    Missing: {keyword}
+                  <Badge key={keyword} variant="outline" className="text-muted-foreground line-through">
+                    {keyword}
                   </Badge>
                 ))}
               </div>

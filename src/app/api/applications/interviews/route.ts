@@ -9,6 +9,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 const listDemoInterviews = (applicationId: string): InterviewEvent[] =>
   Array.from(demoInterviewStore.values())
@@ -41,7 +42,12 @@ export async function GET(request: Request) {
       .eq("application_id", applicationId)
       .order("scheduled_at", { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        return NextResponse.json(listDemoInterviews(applicationId));
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json((data ?? []) as InterviewEvent[]);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
@@ -118,7 +124,35 @@ export async function POST(request: Request) {
       .select("*")
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isSchemaCompatError(error)) {
+        const now = new Date().toISOString();
+        const interview: InterviewEvent = {
+          id: crypto.randomUUID(),
+          user_id: user.id,
+          application_id: applicationId,
+          title,
+          interview_type: interviewType,
+          scheduled_at: scheduledAt,
+          location: typeof body.location === "string" ? body.location : "",
+          notes: typeof body.notes === "string" ? body.notes : "",
+          created_at: now,
+          updated_at: now,
+        };
+        demoInterviewStore.set(interview.id, interview);
+        addDemoTimelineEvent({
+          user_id: user.id,
+          application_id: applicationId,
+          event_type: "interview",
+          title,
+          description: `Interview scheduled for ${new Date(scheduledAt).toLocaleString()}.`,
+          occurred_at: now,
+          metadata: null,
+        });
+        return NextResponse.json(interview);
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     await supabase.from("application_timeline_events").insert({
       user_id: user.id,

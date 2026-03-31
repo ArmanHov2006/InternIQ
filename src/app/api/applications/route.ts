@@ -11,6 +11,10 @@ import {
   isValidStatusChangeSource,
   normalizeStatus,
 } from "@/lib/services/applications/status-utils";
+import {
+  isSchemaCompatError,
+  stripApplicationV4Fields,
+} from "@/lib/server/schema-compat";
 
 const isSupabaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -324,6 +328,28 @@ export async function POST(request: Request) {
       .single();
 
     if (error) {
+      if (isSchemaCompatError(error)) {
+        const legacyInsertPayload = stripApplicationV4Fields(insertPayload);
+        const { data: legacyData, error: legacyError } = await supabase
+          .from("applications")
+          .insert(legacyInsertPayload)
+          .select(APPLICATION_COLUMNS)
+          .single();
+        if (!legacyError && legacyData) {
+          const created = {
+            ...(legacyData as unknown as Application),
+            status:
+              normalizeStatus((legacyData as unknown as Record<string, unknown>).status) ??
+              "saved",
+          };
+          await insertTimelineEvent(supabase, created, {
+            event_type: "system",
+            title: "Application created",
+            description: "Added to the tracker workspace.",
+          });
+          return NextResponse.json(created);
+        }
+      }
       if (
         typeof insertPayload.status === "string" &&
         isStatusCheckConstraintError(error.message)
@@ -560,6 +586,35 @@ export async function PUT(request: Request) {
       .maybeSingle();
 
     if (error) {
+      if (isSchemaCompatError(error)) {
+        const legacyUpdates = stripApplicationV4Fields(updates);
+        const { data: legacyData, error: legacyError } = await supabase
+          .from("applications")
+          .update(legacyUpdates)
+          .eq("id", id)
+          .eq("user_id", user.id)
+          .select(APPLICATION_COLUMNS)
+          .maybeSingle();
+        if (!legacyError && legacyData) {
+          const updated = {
+            ...(legacyData as unknown as Application),
+            status:
+              normalizeStatus((legacyData as unknown as Record<string, unknown>).status) ??
+              "saved",
+          };
+          if (hasIncomingStatus) {
+            await insertTimelineEvent(supabase, updated, {
+              event_type: "status_change",
+              title: `Moved to ${updated.status}`,
+              description:
+                typeof updates.last_status_change_reason === "string"
+                  ? updates.last_status_change_reason
+                  : "Updated from tracker workflow.",
+            });
+          }
+          return NextResponse.json(updated);
+        }
+      }
       if (
         typeof updates.status === "string" &&
         isStatusCheckConstraintError(error.message)
