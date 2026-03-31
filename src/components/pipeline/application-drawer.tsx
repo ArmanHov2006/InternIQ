@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { APPLICATION_STATUSES, STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Application } from "@/types/database";
@@ -22,13 +22,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ApplicationAiPanels } from "@/components/pipeline/application-ai-panels";
+import { ApplicationCommandCenter } from "@/components/pipeline/application-command-center";
 
 type FormState = Pick<
   Application,
   | "company"
   | "role"
   | "job_url"
+  | "job_description"
   | "status"
+  | "source"
+  | "board"
   | "location"
   | "salary_range"
   | "notes"
@@ -36,6 +40,7 @@ type FormState = Pick<
   | "contact_email"
   | "fit_analysis"
   | "generated_email"
+  | "next_action_at"
   | "display_order"
 >;
 
@@ -99,7 +104,10 @@ const toFormState = (application: Application): FormState => ({
   company: application.company ?? "",
   role: application.role ?? "",
   job_url: application.job_url ?? "",
+  job_description: application.job_description ?? "",
   status: application.status,
+  source: application.source ?? "manual",
+  board: application.board ?? "",
   location: application.location ?? "",
   salary_range: application.salary_range ?? "",
   notes: application.notes ?? "",
@@ -107,6 +115,7 @@ const toFormState = (application: Application): FormState => ({
   contact_email: application.contact_email ?? "",
   fit_analysis: application.fit_analysis ?? "",
   generated_email: application.generated_email ?? "",
+  next_action_at: application.next_action_at ?? "",
   display_order: application.display_order ?? 0,
 });
 
@@ -128,8 +137,19 @@ export function ApplicationDrawer({
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [activityOpen, setActivityOpen] = useState(false);
   const [fitResult, setFitResult] = useState<AnalyzeResult | null>(null);
+  const aiCompletion = useMemo(() => {
+    if (!application) return [];
+    const meta = application.ai_metadata as Record<string, unknown> | null | undefined;
+    return [
+      { label: "Analyze fit", done: typeof application.fit_score === "number" },
+      { label: "Cold email", done: Boolean(application.generated_email?.trim()) },
+      { label: "Cover letter", done: Boolean(meta?.coverLetter) },
+      { label: "Interview prep", done: Boolean(meta?.interviewPrep) },
+      { label: "Resume tailor", done: Boolean(meta?.resumeTailor) },
+    ];
+  }, [application]);
+
 
   useEffect(() => {
     if (!application) {
@@ -145,6 +165,10 @@ export function ApplicationDrawer({
     if (!application?.fit_score && application?.fit_score !== 0) return null;
     return `${application.fit_score}/100`;
   }, [application?.fit_score]);
+  const matchScoreLabel = useMemo(() => {
+    if (!application?.match_score && application?.match_score !== 0) return null;
+    return `${application.match_score}/100`;
+  }, [application?.match_score]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -205,6 +229,10 @@ export function ApplicationDrawer({
           contact_email: form.contact_email,
           fit_analysis: form.fit_analysis,
           generated_email: form.generated_email,
+          job_description: form.job_description,
+          source: form.source,
+          board: form.board,
+          next_action_at: form.next_action_at || null,
         },
         "Could not update application."
       );
@@ -245,11 +273,12 @@ export function ApplicationDrawer({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="flex w-full flex-col overflow-hidden border-l border-border p-0 sm:max-w-xl"
+        overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="flex w-full flex-col overflow-hidden border-l border-border bg-drawer-surface p-0 shadow-none sm:max-w-2xl data-[state=closed]:duration-300 data-[state=open]:duration-500"
       >
         <SheetHeader className="border-b border-border px-6 py-4 text-left">
           <div className="flex flex-wrap items-center gap-2 pr-8">
-            <SheetTitle className="text-lg font-semibold">{application.company}</SheetTitle>
+            <SheetTitle className="text-xl font-bold sm:text-2xl">{application.company}</SheetTitle>
             <Badge variant="outline" className={cn("text-xs font-normal", STATUS_COLORS[application.status])}>
               {STATUS_LABELS[application.status]}
             </Badge>
@@ -258,17 +287,40 @@ export function ApplicationDrawer({
                 Fit {fitScoreLabel}
               </Badge>
             ) : null}
+            {matchScoreLabel ? (
+              <Badge variant="secondary" className="text-xs">
+                Match {matchScoreLabel}
+              </Badge>
+            ) : null}
           </div>
           <p className="text-sm text-muted-foreground">{application.role}</p>
         </SheetHeader>
 
-        <Tabs defaultValue="overview" className="flex min-h-0 flex-1 flex-col">
-          <TabsList className="mx-6 mt-4 grid w-auto grid-cols-2 rounded-md bg-muted/50 p-1">
-            <TabsTrigger value="overview" className="text-sm">
+        <Tabs defaultValue="ai" className="flex min-h-0 flex-1 flex-col">
+          <TabsList className="mx-0 mt-0 flex h-auto w-full justify-start gap-0 rounded-none border-b border-border bg-transparent p-0">
+            <TabsTrigger
+              value="ai"
+              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              AI Actions
+            </TabsTrigger>
+            <TabsTrigger
+              value="overview"
+              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
               Overview
             </TabsTrigger>
-            <TabsTrigger value="ai" className="text-sm">
-              AI
+            <TabsTrigger
+              value="notes"
+              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Notes
+            </TabsTrigger>
+            <TabsTrigger
+              value="timeline"
+              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Timeline
             </TabsTrigger>
           </TabsList>
 
@@ -279,42 +331,93 @@ export function ApplicationDrawer({
             <div className="space-y-4">
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-company">Company</Label>
+                  <Label htmlFor="drawer-company" className="text-xs font-medium text-muted-foreground">
+                    Company
+                  </Label>
                   <Input
                     id="drawer-company"
                     value={form.company}
                     onChange={(e) => setField("company", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-role">Role</Label>
+                  <Label htmlFor="drawer-role" className="text-xs font-medium text-muted-foreground">
+                    Role
+                  </Label>
                   <Input
                     id="drawer-role"
                     value={form.role}
                     onChange={(e) => setField("role", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="drawer-job-url">Job URL</Label>
+                <Label htmlFor="drawer-job-url" className="text-xs font-medium text-muted-foreground">
+                  Job URL
+                </Label>
                 <Input
                   id="drawer-job-url"
                   value={form.job_url}
                   onChange={(e) => setField("job_url", e.target.value)}
-                  className="h-9"
+                  className="h-10"
                   placeholder="https://..."
                 />
               </div>
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label>Status</Label>
+                  <Label htmlFor="drawer-source" className="text-xs font-medium text-muted-foreground">
+                    Source
+                  </Label>
+                  <Select
+                    value={form.source ?? "manual"}
+                    onValueChange={(value) => setField("source", value as FormState["source"])}
+                  >
+                    <SelectTrigger id="drawer-source" className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">Manual</SelectItem>
+                      <SelectItem value="extension">Extension</SelectItem>
+                      <SelectItem value="imported">Imported</SelectItem>
+                      <SelectItem value="referral">Referral</SelectItem>
+                      <SelectItem value="automation">Automation</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="drawer-board" className="text-xs font-medium text-muted-foreground">
+                    Board
+                  </Label>
+                  <Input
+                    id="drawer-board"
+                    value={form.board ?? ""}
+                    onChange={(e) => setField("board", e.target.value)}
+                    className="h-10"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="drawer-next-action" className="text-xs font-medium text-muted-foreground">
+                    Next action
+                  </Label>
+                  <Input
+                    id="drawer-next-action"
+                    type="datetime-local"
+                    value={form.next_action_at ? String(form.next_action_at).slice(0, 16) : ""}
+                    onChange={(e) => setField("next_action_at", e.target.value)}
+                    className="h-10"
+                  />
+                </div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-medium text-muted-foreground">Status</Label>
                   <Select
                     value={form.status}
                     onValueChange={(v) => setField("status", v as Application["status"])}
                   >
-                    <SelectTrigger className="h-9">
+                    <SelectTrigger className="h-10">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -327,77 +430,65 @@ export function ApplicationDrawer({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-location">Location</Label>
+                  <Label htmlFor="drawer-location" className="text-xs font-medium text-muted-foreground">
+                    Location
+                  </Label>
                   <Input
                     id="drawer-location"
                     value={form.location}
                     onChange={(e) => setField("location", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-salary">Salary</Label>
+                  <Label htmlFor="drawer-salary" className="text-xs font-medium text-muted-foreground">
+                    Salary
+                  </Label>
                   <Input
                     id="drawer-salary"
                     value={form.salary_range}
                     onChange={(e) => setField("salary_range", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-contact-name">Contact</Label>
+                  <Label htmlFor="drawer-contact-name" className="text-xs font-medium text-muted-foreground">
+                    Contact
+                  </Label>
                   <Input
                     id="drawer-contact-name"
                     value={form.contact_name}
                     onChange={(e) => setField("contact_name", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="drawer-contact-email">Email</Label>
+                  <Label htmlFor="drawer-contact-email" className="text-xs font-medium text-muted-foreground">
+                    Email
+                  </Label>
                   <Input
                     id="drawer-contact-email"
                     type="email"
                     value={form.contact_email}
                     onChange={(e) => setField("contact_email", e.target.value)}
-                    className="h-9"
+                    className="h-10"
                   />
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="drawer-notes">Notes</Label>
+                <Label htmlFor="drawer-job-description" className="text-xs font-medium text-muted-foreground">
+                  Job description
+                </Label>
                 <Textarea
-                  id="drawer-notes"
-                  rows={4}
-                  value={form.notes}
-                  onChange={(e) => setField("notes", e.target.value)}
-                  className="resize-none text-sm"
+                  id="drawer-job-description"
+                  rows={5}
+                  value={form.job_description ?? ""}
+                  onChange={(e) => setField("job_description", e.target.value)}
+                  className="resize-none rounded-lg border-border bg-input text-sm"
                 />
               </div>
-
-              <button
-                type="button"
-                onClick={() => setActivityOpen((v) => !v)}
-                className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm text-muted-foreground hover:bg-muted/40"
-              >
-                <span>Activity</span>
-                <ChevronDown className={cn("h-4 w-4 transition", activityOpen && "rotate-180")} />
-              </button>
-              {activityOpen ? (
-                <div className="space-y-2 rounded-md border border-border bg-muted/20 px-3 py-2 text-xs text-muted-foreground">
-                  <p>
-                    Source: <span className="text-foreground">{application.last_status_change_source ?? "manual"}</span>
-                  </p>
-                  {application.last_status_change_at ? (
-                    <p>Updated: {new Date(application.last_status_change_at).toLocaleString()}</p>
-                  ) : null}
-                  {application.last_status_change_reason ? (
-                    <p>{application.last_status_change_reason}</p>
-                  ) : null}
-                </div>
-              ) : null}
 
               <div className="flex flex-wrap gap-2 border-t border-border pt-4">
                 <Button type="button" size="sm" variant="outline" onClick={() => onOpenChange(false)}>
@@ -423,6 +514,25 @@ export function ApplicationDrawer({
           </TabsContent>
 
           <TabsContent
+            value="notes"
+            className="mt-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 data-[state=inactive]:hidden"
+          >
+            <div className="space-y-2">
+              <Label htmlFor="drawer-notes-tab" className="text-xs font-medium text-muted-foreground">
+                Notes
+              </Label>
+              <p className="text-xs text-muted-foreground">Autosaves after you pause typing.</p>
+              <Textarea
+                id="drawer-notes-tab"
+                rows={12}
+                value={form.notes}
+                onChange={(e) => setField("notes", e.target.value)}
+                className="resize-none rounded-lg border-border bg-input text-sm"
+              />
+            </div>
+          </TabsContent>
+
+          <TabsContent
             value="ai"
             className="mt-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 data-[state=inactive]:hidden"
           >
@@ -433,6 +543,49 @@ export function ApplicationDrawer({
               setFitResult={setFitResult}
               onPatch={patchApplication}
             />
+          </TabsContent>
+
+          <TabsContent
+            value="timeline"
+            className="mt-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 data-[state=inactive]:hidden"
+          >
+            <div className="space-y-4">
+              <div className="rounded-lg border border-border bg-card p-4 text-sm">
+                <p className="font-medium text-foreground">Status activity</p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Source: <span className="text-foreground">{application.last_status_change_source ?? "manual"}</span>
+                </p>
+                {application.last_status_change_at ? (
+                  <p className="text-xs text-muted-foreground">
+                    Updated: {new Date(application.last_status_change_at).toLocaleString()}
+                  </p>
+                ) : null}
+                {application.last_status_change_reason ? (
+                  <p className="mt-2 text-xs text-muted-foreground">{application.last_status_change_reason}</p>
+                ) : null}
+              </div>
+
+              <div className="rounded-lg border border-border bg-card p-4">
+                <p className="font-medium text-foreground">AI actions</p>
+                <ul className="mt-2 space-y-2">
+                  {aiCompletion.map((item) => (
+                    <li key={item.label} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{item.label}</span>
+                      <span
+                        className={cn(
+                          "rounded-full border px-2 py-0.5",
+                          item.done ? "border-primary/40 text-foreground" : "border-border text-muted-foreground"
+                        )}
+                      >
+                        {item.done ? "Completed" : "Pending"}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <ApplicationCommandCenter application={application} />
+            </div>
           </TabsContent>
         </Tabs>
       </SheetContent>

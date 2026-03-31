@@ -50,7 +50,7 @@ export const MobileTopBar = () => {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[88%] max-w-sm border-white/10 bg-background/95 p-0">
+          <SheetContent side="left" className="w-[88%] max-w-sm border-border bg-background/95 p-0">
             <div className="flex h-full flex-col p-4">
               <div className="mb-4 inline-flex items-center gap-2">
                 <IconFrame className="h-7 w-7 rounded-md">

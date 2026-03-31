@@ -18,7 +18,7 @@ export const EmptyState = ({
 }: EmptyStateProps) => {
   return (
     <div className={cn("glass-strong rounded-2xl p-8 text-center", className)}>
-      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-primary">
+      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-border bg-muted text-primary">
         {icon}
       </div>
       <h3 className="text-xl font-semibold">{title}</h3>

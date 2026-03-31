@@ -2,14 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BarChart3, Plus } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import type { Application } from "@/types/database";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatCardSkeleton } from "@/components/dashboard/stat-card-skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
-import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { dispatchOpenAddApplication } from "@/lib/events";
 
 const pipelineStatuses: Application["status"][] = [
   "saved",
@@ -20,11 +18,11 @@ const pipelineStatuses: Application["status"][] = [
 ];
 
 const pipelineColors: Record<Application["status"], string> = {
-  saved: "bg-muted-foreground/40",
-  applied: "bg-muted-foreground/50",
-  interview: "bg-primary/60",
-  offer: "bg-primary/70",
-  rejected: "bg-muted-foreground/35",
+  saved: "bg-[var(--status-saved)]",
+  applied: "bg-[var(--status-applied)]",
+  interview: "bg-[var(--status-interview)]",
+  offer: "bg-[var(--status-offer)]",
+  rejected: "bg-[var(--status-rejected)]",
 };
 
 /** Last 6 weeks counts of created applications */
@@ -183,27 +181,12 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" className="gap-2" onClick={() => dispatchOpenAddApplication()}>
-          <Plus className="h-4 w-4" />
-          Add application
-        </Button>
-        <Button size="sm" variant="ghost" asChild>
-          <Link href="/dashboard/pipeline">Open pipeline</Link>
-        </Button>
-      </div>
-
       {applications.length === 0 && !loading ? (
         <EmptyState
           icon={<BarChart3 className="h-5 w-5" />}
           title="No applications yet"
           description="Add an application to see analytics."
-          action={
-            <Button size="sm" variant="outline" className="gap-2" onClick={() => dispatchOpenAddApplication()}>
-              <Plus className="h-4 w-4" />
-              Add application
-            </Button>
-          }
+          action={<Link className="text-sm text-primary underline-offset-4 hover:underline" href="/dashboard/pipeline">Open pipeline</Link>}
         />
       ) : null}
 

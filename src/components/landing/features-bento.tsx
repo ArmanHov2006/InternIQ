@@ -27,7 +27,7 @@ const AITypingEffect = () => {
         initial={{ width: 0 }}
         animate={{ width: "60%" }}
         transition={{ duration: 1, delay: 1.1 }}
-        className="h-2 rounded-full bg-gradient-to-r from-accent-cyan/40 to-accent-cyan/10"
+        className="h-2 rounded-full bg-gradient-to-r from-accent-warm/40 to-accent-warm/10"
       />
     </div>
   );
@@ -133,10 +133,10 @@ export const FeaturesBento = () => {
         <SectionReveal>
           <BentoCard className="group transition-all duration-300 hover:scale-[1.01] hover:border-white/20 hover:shadow-glow-sm">
             <div className="flex items-start justify-between">
-              <div className="rounded-xl border border-white/10 bg-gradient-to-br from-accent-cyan/20 to-accent-cyan/5 p-2.5">
-                <Mail className="h-4 w-4 text-accent-cyan" />
+              <div className="rounded-xl border border-white/10 bg-gradient-to-br from-accent-warm/20 to-accent-warm/5 p-2.5">
+                <Mail className="h-4 w-4 text-accent-warm" />
               </div>
-              <span className="rounded-full bg-accent-cyan/20 px-2 py-0.5 text-xs text-accent-cyan">Popular</span>
+              <span className="rounded-full bg-accent-warm/20 px-2 py-0.5 text-xs text-accent-warm">Popular</span>
             </div>
             <h3 className="mt-3 text-lg font-semibold">Cold Email Generator</h3>
             <p className="mt-1 text-sm text-muted-foreground">Personalized outreach in seconds.</p>

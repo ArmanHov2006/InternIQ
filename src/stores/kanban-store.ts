@@ -19,6 +19,7 @@ export interface KanbanCardData {
   lastStatusChangeSource?: "manual" | "gmail_auto" | "gmail_confirmed" | "system";
   lastStatusChangeReason?: string;
   lastStatusChangeAt?: string;
+  aiCompletedCount?: number;
 }
 
 interface ColumnData {
@@ -58,12 +59,26 @@ const toSafeStatus = (value: unknown): StatusId => {
   return isStatusId(value) ? value : "saved";
 };
 
+const getAiCompletedCount = (application: Application): number => {
+  let count = 0;
+  if (typeof application.fit_score === "number") count += 1;
+  if (application.generated_email?.trim()) count += 1;
+  const meta = application.ai_metadata;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const typed = meta as Record<string, unknown>;
+    if (typed.coverLetter) count += 1;
+    if (typed.interviewPrep) count += 1;
+    if (typed.resumeTailor) count += 1;
+  }
+  return count;
+};
+
 const columnsSeed: Record<StatusId, ColumnData> = {
-  saved: { id: "saved", title: "Saved", color: "oklch(0.65 0.25 265)", cardIds: [] },
-  applied: { id: "applied", title: "Applied", color: "oklch(0.58 0.19 280)", cardIds: [] },
-  interview: { id: "interview", title: "Interview", color: "oklch(0.7 0.2 300)", cardIds: [] },
-  offer: { id: "offer", title: "Offer", color: "oklch(0.78 0.2 145)", cardIds: [] },
-  rejected: { id: "rejected", title: "Rejected", color: "oklch(0.66 0.23 30)", cardIds: [] },
+  saved: { id: "saved", title: "Saved", color: "#FF7A3D", cardIds: [] },
+  applied: { id: "applied", title: "Applied", color: "#FF8A50", cardIds: [] },
+  interview: { id: "interview", title: "Interview", color: "#FFB380", cardIds: [] },
+  offer: { id: "offer", title: "Offer", color: "#4ADE80", cardIds: [] },
+  rejected: { id: "rejected", title: "Rejected", color: "#F87171", cardIds: [] },
 };
 
 export const useKanbanStore = create<KanbanState>()(
@@ -124,6 +139,7 @@ export const useKanbanStore = create<KanbanState>()(
               lastStatusChangeSource: app.last_status_change_source ?? "manual",
               lastStatusChangeReason: app.last_status_change_reason ?? "",
               lastStatusChangeAt: app.last_status_change_at ?? app.updated_at,
+              aiCompletedCount: getAiCompletedCount(app),
             };
             const status = toSafeStatus(app.status);
             nextColumns[status].cardIds.push(app.id);
@@ -178,6 +194,7 @@ export const useKanbanStore = create<KanbanState>()(
                 lastStatusChangeSource: application.last_status_change_source ?? "manual",
                 lastStatusChangeReason: application.last_status_change_reason ?? "",
                 lastStatusChangeAt: application.last_status_change_at ?? application.updated_at,
+                aiCompletedCount: getAiCompletedCount(application),
               },
             },
           };

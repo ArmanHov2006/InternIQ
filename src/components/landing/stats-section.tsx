@@ -30,7 +30,7 @@ const stats = [
     label: "Fit Score Boost",
     description: "Average improvement",
     icon: Target,
-    color: "from-accent-cyan/30 to-accent-cyan/10"
+    color: "from-accent-warm/30 to-accent-warm/10"
   },
   { 
     value: 3.2, 

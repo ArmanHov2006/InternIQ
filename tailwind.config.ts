@@ -41,7 +41,19 @@ const config: Config = {
         ring: "var(--ring)",
         glow: "var(--glow)",
         "accent-cyan": "var(--accent-cyan)",
+        "accent-warm": "var(--accent-warm)",
         "surface-glass": "var(--surface-glass)",
+        sidebar: "var(--sidebar)",
+        "drawer-surface": "var(--drawer-surface)",
+        destructive: {
+          DEFAULT: "var(--destructive)",
+          foreground: "var(--destructive-foreground)",
+        },
+        "status-saved": "var(--status-saved)",
+        "status-applied": "var(--status-applied)",
+        "status-interview": "var(--status-interview)",
+        "status-offer": "var(--status-offer)",
+        "status-rejected": "var(--status-rejected)",
       },
       fontFamily: {
         sans: ["var(--font-sans)", "Inter", "sans-serif"],
@@ -56,11 +68,10 @@ const config: Config = {
       boxShadow: {
         "glow-xs": "0 0 12px var(--glow)",
         "glow-sm": "0 0 20px var(--glow)",
-        "glow-md": "0 0 40px var(--glow), 0 0 80px oklch(0.65 0.25 265 / 15%)",
-        "glow-lg":
-          "0 0 60px var(--glow), 0 0 120px oklch(0.65 0.25 265 / 10%), 0 0 200px oklch(0.7 0.2 300 / 5%)",
-        "inner-glow": "inset 0 0 24px oklch(1 0 0 / 8%)",
-        "card-3d": "0 20px 55px oklch(0.1 0.02 260 / 45%)",
+        "glow-md": "var(--glow-md)",
+        "glow-lg": "var(--glow-lg)",
+        "inner-glow": "inset 0 0 24px rgba(255, 255, 255, 0.06)",
+        "card-3d": "none",
       },
       keyframes: {
         float: {
@@ -108,7 +119,7 @@ const config: Config = {
       },
       backgroundImage: {
         "mesh-gradient":
-          "radial-gradient(at 12% 12%, oklch(0.65 0.25 265 / 0.35) 0px, transparent 45%), radial-gradient(at 85% 18%, oklch(0.7 0.2 300 / 0.35) 0px, transparent 45%), radial-gradient(at 45% 80%, oklch(0.75 0.15 195 / 0.25) 0px, transparent 45%)",
+          "radial-gradient(at 12% 12%, rgba(255, 106, 43, 0.12) 0px, transparent 45%), radial-gradient(at 85% 18%, rgba(255, 138, 80, 0.1) 0px, transparent 45%), radial-gradient(at 45% 80%, rgba(255, 122, 61, 0.08) 0px, transparent 45%)",
       },
     },
   },

@@ -1,45 +1,28 @@
 "use client";
 
-import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { useTilt } from "@/hooks/use-tilt";
 
 interface GlassCardProps {
   children: ReactNode;
   className?: string;
+  /** Retained for API compatibility; premium stat cards use flat borders per design system. */
   tiltEnabled?: boolean;
   glowColor?: string;
 }
 
-export const GlassCard = ({
-  children,
-  className,
-  tiltEnabled = true,
-  glowColor,
-}: GlassCardProps) => {
-  const { rotateX, rotateY, onMouseMove, onMouseLeave } = useTilt(5);
-
+export const GlassCard = ({ children, className, glowColor }: GlassCardProps) => {
   return (
-    <motion.div
-      style={{
-        rotateX: tiltEnabled ? rotateX : 0,
-        rotateY: tiltEnabled ? rotateY : 0,
-        transformPerspective: 900,
-        boxShadow: glowColor
-          ? `0 0 35px ${glowColor}, 0 25px 50px oklch(0.1 0.02 260 / 35%)`
-          : undefined,
-      }}
-      onMouseMove={tiltEnabled ? onMouseMove : undefined}
-      onMouseLeave={tiltEnabled ? onMouseLeave : undefined}
-      whileHover={{ y: -3, scale: 1.01 }}
-      transition={{ type: "spring", stiffness: 300, damping: 30 }}
+    <div
       className={cn(
-        "glass rounded-2xl shadow-card-3d transition-colors will-change-transform",
+        "rounded-2xl border border-border bg-card text-card-foreground shadow-none transition-colors duration-100",
+        "hover:border-primary/20",
+        glowColor && "shadow-glow-sm",
         className
       )}
+      style={glowColor ? { boxShadow: `0 0 24px ${glowColor}` } : undefined}
     >
       {children}
-    </motion.div>
+    </div>
   );
 };

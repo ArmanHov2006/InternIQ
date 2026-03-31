@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import type { Application } from "@/types/database";
-import { APPLICATION_STATUSES } from "@/lib/constants";
+import {
+  APPLICATION_CREATE_KEYS,
+  APPLICATION_UPDATE_KEYS,
+  buildWriteStatusCandidates,
+  isStatusCheckConstraintError,
+  isValidApplicationSource,
+  isValidStatus,
+  isValidStatusChangeSource,
+  normalizeStatus,
+} from "@/lib/services/applications/status-utils";
 
 const isSupabaseConfigured = Boolean(
   process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
@@ -23,14 +32,22 @@ const createDemoApp = (
     status,
     applied_date: now.slice(0, 10),
     job_url: "",
+    job_description: "",
+    source: "manual",
+    board: "",
+    external_job_id: "",
     location: "Remote",
     notes: "",
     fit_score: null,
+    match_score: null,
     salary_range: "",
     fit_analysis: "",
     contact_name: "",
     contact_email: "",
     generated_email: "",
+    next_action_at: null,
+    last_contacted_at: null,
+    resume_version_id: null,
     display_order: displayOrder,
     last_status_change_source: "manual",
     last_status_change_reason: "Seeded demo application.",
@@ -49,137 +66,6 @@ const demoApps = new Map<string, Application>([
 const statusAliasCacheByUser = new Map<string, Partial<Record<Application["status"], string>>>();
 
 const APPLICATION_COLUMNS = "*";
-
-const APPLICATION_CREATE_KEYS = new Set([
-  "company",
-  "role",
-  "job_url",
-  "status",
-  "location",
-  "salary_range",
-  "notes",
-  "contact_name",
-  "contact_email",
-  "fit_score",
-  "fit_analysis",
-  "generated_email",
-  "display_order",
-  "applied_date",
-  "last_status_change_source",
-  "last_status_change_reason",
-  "last_status_change_at",
-  "ai_metadata",
-]);
-
-const APPLICATION_UPDATE_KEYS = new Set([
-  "company",
-  "role",
-  "job_url",
-  "status",
-  "location",
-  "salary_range",
-  "notes",
-  "contact_name",
-  "contact_email",
-  "fit_score",
-  "fit_analysis",
-  "generated_email",
-  "display_order",
-  "applied_date",
-  "last_status_change_source",
-  "last_status_change_reason",
-  "last_status_change_at",
-  "ai_metadata",
-  "id",
-]);
-
-const STATUS_CHANGE_SOURCES = [
-  "manual",
-  "gmail_auto",
-  "gmail_confirmed",
-  "system",
-] as const;
-const isValidStatusChangeSource = (
-  value: unknown
-): value is (typeof STATUS_CHANGE_SOURCES)[number] =>
-  typeof value === "string" &&
-  (STATUS_CHANGE_SOURCES as readonly string[]).includes(value);
-
-const isValidStatus = (value: unknown): boolean =>
-  typeof value === "string" &&
-  (APPLICATION_STATUSES as readonly string[]).includes(value);
-
-const DB_STATUS_CANDIDATES: Record<Application["status"], string[]> = {
-  saved: ["saved", "wishlist", "bookmarked", "draft"],
-  applied: ["applied", "application_submitted", "submitted"],
-  interview: [
-    "interview",
-    "interviewing",
-    "onsite",
-    "final_round",
-    "final round",
-    "phone_screen",
-    "phone-screen",
-    "phone screen",
-    "screening",
-    "phone",
-  ],
-  offer: ["offer", "offered", "accepted"],
-  rejected: ["rejected", "declined", "no_offer", "no offer"],
-};
-
-const LEGACY_TO_CANONICAL: Record<string, Application["status"]> = Object.entries(
-  DB_STATUS_CANDIDATES
-).reduce((acc, [canonical, candidates]) => {
-  for (const candidate of candidates) {
-    const key = candidate.trim().toLowerCase().replace(/[\s-]+/g, "_");
-    acc[key] = canonical as Application["status"];
-  }
-  return acc;
-}, {} as Record<string, Application["status"]>);
-
-const normalizeStatus = (value: unknown): Application["status"] | null => {
-  if (typeof value !== "string") return null;
-  const key = value.trim().toLowerCase().replace(/[\s-]+/g, "_");
-  return LEGACY_TO_CANONICAL[key] ?? null;
-};
-
-const legacyStatusCandidates = (status: Application["status"]): string[] =>
-  DB_STATUS_CANDIDATES[status] ?? [status];
-
-const toTitleCase = (value: string): string =>
-  value
-    .split(" ")
-    .map((segment) =>
-      segment.length ? segment[0].toUpperCase() + segment.slice(1).toLowerCase() : segment
-    )
-    .join(" ");
-
-const buildWriteStatusCandidates = (
-  canonicalStatus: Application["status"],
-  userId?: string
-): string[] => {
-  const spaced = canonicalStatus.replace(/_/g, " ");
-  const hyphenated = canonicalStatus.replace(/_/g, "-");
-  const userAlias = userId ? statusAliasCacheByUser.get(userId)?.[canonicalStatus] : undefined;
-
-  const candidates = [
-    userAlias,
-    canonicalStatus,
-    spaced,
-    hyphenated,
-    toTitleCase(spaced),
-    toTitleCase(hyphenated.replace(/-/g, " ")),
-    spaced.toUpperCase(),
-    hyphenated.toUpperCase(),
-    ...legacyStatusCandidates(canonicalStatus),
-  ].filter((value): value is string => typeof value === "string" && value.trim().length > 0);
-
-  return Array.from(new Set(candidates));
-};
-
-const isStatusCheckConstraintError = (message: string): boolean =>
-  message.toLowerCase().includes("applications_status_check");
 
 const ensureObjectBody = async (
   request: Request
@@ -203,6 +89,29 @@ type AuthSuccess = {
 
 type AuthFailure = {
   response: NextResponse;
+};
+
+const insertTimelineEvent = async (
+  supabase: ReturnType<typeof createClient>,
+  application: Application,
+  event: {
+    event_type: "status_change" | "contact" | "interview" | "artifact" | "note" | "system";
+    title: string;
+    description: string;
+  }
+) => {
+  try {
+    await supabase.from("application_timeline_events").insert({
+      user_id: application.user_id,
+      application_id: application.id,
+      event_type: event.event_type,
+      title: event.title,
+      description: event.description,
+      occurred_at: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error("Failed to insert application timeline event", error);
+  }
 };
 
 const withAuth = async (): Promise<AuthSuccess | AuthFailure> => {
@@ -299,13 +208,27 @@ export async function POST(request: Request) {
         applied_date: typeof body.applied_date === "string" ? body.applied_date : "",
         location: typeof body.location === "string" ? body.location : "",
         job_url: typeof body.job_url === "string" ? body.job_url : "",
+        job_description: typeof body.job_description === "string" ? body.job_description : "",
+        source:
+          body.source === "extension" ||
+          body.source === "imported" ||
+          body.source === "referral" ||
+          body.source === "automation"
+            ? body.source
+            : "manual",
+        board: typeof body.board === "string" ? body.board : "",
+        external_job_id: typeof body.external_job_id === "string" ? body.external_job_id : "",
         notes: typeof body.notes === "string" ? body.notes : "",
         fit_score: typeof body.fit_score === "number" ? body.fit_score : null,
-        salary_range: "",
-        fit_analysis: "",
-        contact_name: "",
-        contact_email: "",
-        generated_email: "",
+        match_score: typeof body.match_score === "number" ? body.match_score : null,
+        salary_range: typeof body.salary_range === "string" ? body.salary_range : "",
+        fit_analysis: typeof body.fit_analysis === "string" ? body.fit_analysis : "",
+        contact_name: typeof body.contact_name === "string" ? body.contact_name : "",
+        contact_email: typeof body.contact_email === "string" ? body.contact_email : "",
+        generated_email: typeof body.generated_email === "string" ? body.generated_email : "",
+        next_action_at: typeof body.next_action_at === "string" ? body.next_action_at : null,
+        last_contacted_at: typeof body.last_contacted_at === "string" ? body.last_contacted_at : null,
+        resume_version_id: typeof body.resume_version_id === "string" ? body.resume_version_id : null,
         display_order: Math.max(displayOrder, 0),
         last_status_change_source: "manual",
         last_status_change_reason: "Created via demo fallback.",
@@ -370,6 +293,16 @@ export async function POST(request: Request) {
         insertPayload[key] = value;
         continue;
       }
+      if (key === "source") {
+        if (!isValidApplicationSource(value)) {
+          return NextResponse.json(
+            { error: "Invalid application source" },
+            { status: 400 }
+          );
+        }
+        insertPayload[key] = value;
+        continue;
+      }
       insertPayload[key] = value;
     }
 
@@ -397,6 +330,7 @@ export async function POST(request: Request) {
       ) {
         const fallbackCandidates = buildWriteStatusCandidates(
           insertPayload.status as Application["status"],
+          statusAliasCacheByUser,
           user.id
         ).filter((candidate) => candidate !== insertPayload.status);
 
@@ -432,10 +366,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({
+    const created = {
       ...(data as unknown as Application),
       status: normalizeStatus((data as unknown as Record<string, unknown>).status) ?? "saved",
+    };
+    await insertTimelineEvent(supabase, created, {
+      event_type: "system",
+      title: "Application created",
+      description: "Added to the tracker workspace.",
     });
+    return NextResponse.json(created);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });
@@ -474,7 +414,21 @@ export async function PUT(request: Request) {
         location: typeof body.location === "string" ? body.location : existing.location,
         notes: typeof body.notes === "string" ? body.notes : existing.notes,
         job_url: typeof body.job_url === "string" ? body.job_url : existing.job_url,
+        job_description:
+          typeof body.job_description === "string" ? body.job_description : existing.job_description ?? "",
+        source:
+          body.source === "extension" ||
+          body.source === "imported" ||
+          body.source === "referral" ||
+          body.source === "automation" ||
+          body.source === "manual"
+            ? body.source
+            : existing.source ?? "manual",
+        board: typeof body.board === "string" ? body.board : existing.board ?? "",
+        external_job_id:
+          typeof body.external_job_id === "string" ? body.external_job_id : existing.external_job_id ?? "",
         fit_score: typeof body.fit_score === "number" ? body.fit_score : existing.fit_score,
+        match_score: typeof body.match_score === "number" ? body.match_score : existing.match_score ?? null,
         fit_analysis: typeof body.fit_analysis === "string" ? body.fit_analysis : existing.fit_analysis,
         generated_email:
           typeof body.generated_email === "string" ? body.generated_email : existing.generated_email,
@@ -486,6 +440,18 @@ export async function PUT(request: Request) {
           typeof body.applied_date === "string"
             ? body.applied_date
             : existing.applied_date,
+        next_action_at:
+          typeof body.next_action_at === "string"
+            ? body.next_action_at
+            : existing.next_action_at ?? null,
+        last_contacted_at:
+          typeof body.last_contacted_at === "string"
+            ? body.last_contacted_at
+            : existing.last_contacted_at ?? null,
+        resume_version_id:
+          typeof body.resume_version_id === "string"
+            ? body.resume_version_id
+            : existing.resume_version_id ?? null,
         status: nextStatus ?? existing.status,
         display_order: nextDisplayOrder,
         updated_at: new Date().toISOString(),
@@ -529,6 +495,16 @@ export async function PUT(request: Request) {
         if (!isValidStatusChangeSource(value)) {
           return NextResponse.json(
             { error: "Invalid status change source" },
+            { status: 400 }
+          );
+        }
+        updates[key] = value;
+        continue;
+      }
+      if (key === "source") {
+        if (!isValidApplicationSource(value)) {
+          return NextResponse.json(
+            { error: "Invalid application source" },
             { status: 400 }
           );
         }
@@ -590,6 +566,7 @@ export async function PUT(request: Request) {
       ) {
         const fallbackCandidates = buildWriteStatusCandidates(
           updates.status as Application["status"],
+          statusAliasCacheByUser,
           user.id
         ).filter((candidate) => candidate !== updates.status);
         for (const candidate of fallbackCandidates) {
@@ -634,10 +611,21 @@ export async function PUT(request: Request) {
       );
     }
 
-    return NextResponse.json({
+    const updated = {
       ...(data as unknown as Application),
       status: normalizeStatus((data as unknown as Record<string, unknown>).status) ?? "saved",
-    });
+    };
+    if (hasIncomingStatus) {
+      await insertTimelineEvent(supabase, updated, {
+        event_type: "status_change",
+        title: `Moved to ${updated.status}`,
+        description:
+          typeof updates.last_status_change_reason === "string"
+            ? updates.last_status_change_reason
+            : "Updated from tracker workflow.",
+      });
+    }
+    return NextResponse.json(updated);
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unexpected error";
     return NextResponse.json({ error: message }, { status: 500 });

@@ -31,7 +31,7 @@ export const CustomCursor = () => {
   const modeClass = useMemo(() => {
     if (mode === "pointer") return "h-12 w-12 border-primary/60";
     if (mode === "text") return "h-10 w-1 rounded-full border-accent/70";
-    if (mode === "drag") return "h-10 w-10 border-accent-cyan/70";
+    if (mode === "drag") return "h-10 w-10 border-accent-warm/70";
     return "h-8 w-8 border-white/40";
   }, [mode]);
 

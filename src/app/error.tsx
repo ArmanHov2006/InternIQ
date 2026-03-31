@@ -19,7 +19,7 @@ export default function Error({
       </div>
       <GlassCard className="max-w-lg p-8 text-center" tiltEnabled={false}>
         <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-white/10 bg-white/5">
-          <AlertTriangle className="h-5 w-5 text-accent-cyan" />
+          <AlertTriangle className="h-5 w-5 text-accent-warm" />
         </div>
         <h1 className="font-display text-4xl">Something went wrong</h1>
         <p className="mt-2 text-muted-foreground">A temporary issue happened. You can try again safely.</p>

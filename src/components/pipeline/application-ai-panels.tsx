@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { ChevronDown, Loader2 } from "lucide-react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { FileText, Loader2, Mail, MessagesSquare, Sparkles, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { Application, Resume } from "@/types/database";
@@ -63,6 +63,41 @@ const mergeMeta = (app: Application, patch: Partial<AiMeta>): Record<string, unk
   ...patch,
 });
 
+function AiActionRow({
+  icon,
+  title,
+  description,
+  action,
+  loading,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  action: ReactNode;
+  loading?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border border-border bg-card p-4 transition-colors duration-100",
+        loading && "animate-glow-pulse shadow-glow-xs"
+      )}
+    >
+      <div className="flex flex-col items-stretch gap-4 sm:flex-row sm:items-center">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">{icon}</div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground">{title}</p>
+          <p className="text-xs text-muted-foreground">{description}</p>
+        </div>
+        <div className="flex shrink-0 justify-end sm:justify-start">{action}</div>
+      </div>
+      {children ? <div className="mt-4 space-y-3 border-t border-border pt-4">{children}</div> : null}
+    </div>
+  );
+}
+
 export function ApplicationAiPanels({
   application,
   form,
@@ -81,8 +116,6 @@ export function ApplicationAiPanels({
   const [resumes, setResumes] = useState<Resume[]>([]);
   const [selectedResumeId, setSelectedResumeId] = useState("");
   const [loadingResumes, setLoadingResumes] = useState(false);
-  const [prepareOpen, setPrepareOpen] = useState(true);
-
   const [tone, setTone] = useState<"professional" | "casual" | "enthusiastic">("professional");
   const [coverLoading, setCoverLoading] = useState(false);
   const [interviewLoading, setInterviewLoading] = useState(false);
@@ -319,140 +352,152 @@ export function ApplicationAiPanels({
   const hasFit = application.fit_score !== null && application.fit_score !== undefined;
 
   return (
-    <div className="space-y-6">
-      <section className="space-y-3 rounded-md border border-border p-3">
-        <h3 className="text-sm font-medium">Analyze fit</h3>
-        <p className="text-xs text-muted-foreground">
-          Uses your primary resume from Settings. Requires a job URL on the application.
-        </p>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          className="gap-2"
-          onClick={() => void handleAnalyzeFit()}
-          disabled={analyzingFit || !form.job_url?.trim()}
-        >
-          {analyzingFit ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-          {hasFit ? "Re-run analysis" : "Run fit analysis"}
-        </Button>
-        {fitResult ? (
-          <div className="pt-2">
-            <FitScoreDisplay result={fitResult} jobUrl={form.job_url} showSaveAction={false} />
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label className="text-xs font-medium text-muted-foreground">Resume for AI</Label>
+        <Select value={selectedResumeId} onValueChange={setSelectedResumeId} disabled={loadingResumes}>
+          <SelectTrigger className="h-10">
+            <SelectValue placeholder={loadingResumes ? "Loading…" : "Select resume"} />
+          </SelectTrigger>
+          <SelectContent>
+            {resumes.map((r) => (
+              <SelectItem key={r.id} value={r.id}>
+                {r.file_name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <AiActionRow
+        icon={<Sparkles className="h-4 w-4" />}
+        title="Fit analysis"
+        description="Uses your primary resume from Settings. Requires a job URL on the Overview tab."
+        loading={analyzingFit}
+        action={
+          <Button
+            type="button"
+            size="sm"
+            className="min-w-[88px] px-4"
+            onClick={() => void handleAnalyzeFit()}
+            disabled={analyzingFit || !form.job_url?.trim()}
+          >
+            {analyzingFit ? <Loader2 className="h-4 w-4 animate-spin" /> : hasFit ? "Re-run" : "Run"}
+          </Button>
+        }
+      >
+        {fitResult ? <FitScoreDisplay result={fitResult} jobUrl={form.job_url} showSaveAction={false} /> : null}
+      </AiActionRow>
+
+      <AiActionRow
+        icon={<Wand2 className="h-4 w-4" />}
+        title="Resume tailor"
+        description="Paste a job description and align your selected resume."
+        loading={tailorLoading}
+        action={
+          <Button
+            type="button"
+            size="sm"
+            className="min-w-[88px] px-4"
+            onClick={() => void handleResumeTailor()}
+            disabled={tailorLoading || !selectedResumeText || !jobDescription.trim()}
+          >
+            {tailorLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
+          </Button>
+        }
+      >
+        <Textarea
+          rows={4}
+          placeholder="Paste job description"
+          value={jobDescription}
+          onChange={(e) => setJobDescription(e.target.value)}
+          className="text-xs"
+        />
+        {meta.resumeTailor?.summary ? (
+          <p className="text-xs text-muted-foreground">{meta.resumeTailor.summary}</p>
+        ) : null}
+      </AiActionRow>
+
+      <AiActionRow
+        icon={<FileText className="h-4 w-4" />}
+        title="Cover letter"
+        description="Match tone to the company and role."
+        loading={coverLoading}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
+              <SelectTrigger className="h-9 w-[132px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="professional">Professional</SelectItem>
+                <SelectItem value="casual">Casual</SelectItem>
+                <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button type="button" size="sm" className="min-w-[88px] px-4" onClick={() => void handleCoverLetter()} disabled={coverLoading}>
+              {coverLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
+            </Button>
+          </div>
+        }
+      >
+        {meta.coverLetter?.content ? (
+          <div className="rounded-lg border border-border bg-muted/20 p-3 text-xs">
+            <p className="font-medium text-foreground">{meta.coverLetter.title}</p>
+            <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{meta.coverLetter.content}</p>
           </div>
         ) : null}
-      </section>
+      </AiActionRow>
 
-      <section className="space-y-2">
-        <button
-          type="button"
-          onClick={() => setPrepareOpen((v) => !v)}
-          className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-left text-sm font-medium"
-        >
-          Prepare (email, letters, prep)
-          <ChevronDown className={cn("h-4 w-4 transition", prepareOpen && "rotate-180")} />
-        </button>
-        {prepareOpen ? (
-          <div className="space-y-6 border-l border-border pl-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Resume for AI</Label>
-              <Select value={selectedResumeId} onValueChange={setSelectedResumeId} disabled={loadingResumes}>
-                <SelectTrigger className="h-9">
-                  <SelectValue placeholder={loadingResumes ? "Loading…" : "Select resume"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {resumes.map((r) => (
-                    <SelectItem key={r.id} value={r.id}>
-                      {r.file_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-muted-foreground">Cold email</h4>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleGenerateColdEmail()}
-                disabled={generatingEmail || !form.job_url?.trim()}
-              >
-                {generatingEmail ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Generate & save
-              </Button>
-              {form.generated_email ? (
-                <Textarea readOnly rows={5} value={form.generated_email} className="text-xs" />
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-muted-foreground">Cover letter</h4>
-              <div className="flex gap-2">
-                <Select value={tone} onValueChange={(v) => setTone(v as typeof tone)}>
-                  <SelectTrigger className="h-9 w-36">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="professional">Professional</SelectItem>
-                    <SelectItem value="casual">Casual</SelectItem>
-                    <SelectItem value="enthusiastic">Enthusiastic</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button type="button" size="sm" variant="outline" onClick={() => void handleCoverLetter()} disabled={coverLoading}>
-                  {coverLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate"}
-                </Button>
-              </div>
-              {meta.coverLetter?.content ? (
-                <div className="rounded border border-border bg-muted/20 p-2 text-xs">
-                  <p className="font-medium">{meta.coverLetter.title}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{meta.coverLetter.content}</p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-muted-foreground">Interview prep</h4>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={() => void handleInterviewPrep()}
-                disabled={interviewLoading || !form.job_url?.trim()}
-              >
-                {interviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Generate questions"}
-              </Button>
-              {meta.interviewPrep?.questions?.length ? (
-                <ul className="space-y-2 text-xs">
-                  {meta.interviewPrep.questions.slice(0, 5).map((q, i) => (
-                    <li key={i} className="rounded border border-border p-2">
-                      <p className="font-medium">{q.question}</p>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
-            </div>
-
-            <div className="space-y-2">
-              <h4 className="text-xs font-medium text-muted-foreground">Resume tailor</h4>
-              <Textarea
-                rows={4}
-                placeholder="Paste job description"
-                value={jobDescription}
-                onChange={(e) => setJobDescription(e.target.value)}
-                className="text-xs"
-              />
-              <Button type="button" size="sm" variant="outline" onClick={() => void handleResumeTailor()} disabled={tailorLoading}>
-                {tailorLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Get suggestions"}
-              </Button>
-              {meta.resumeTailor?.summary ? (
-                <p className="text-xs text-muted-foreground">{meta.resumeTailor.summary}</p>
-              ) : null}
-            </div>
-          </div>
+      <AiActionRow
+        icon={<MessagesSquare className="h-4 w-4" />}
+        title="Interview prep"
+        description="Generates focused questions from the job URL and resume."
+        loading={interviewLoading}
+        action={
+          <Button
+            type="button"
+            size="sm"
+            className="min-w-[88px] px-4"
+            onClick={() => void handleInterviewPrep()}
+            disabled={interviewLoading || !form.job_url?.trim()}
+          >
+            {interviewLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
+          </Button>
+        }
+      >
+        {meta.interviewPrep?.questions?.length ? (
+          <ul className="space-y-2 text-xs">
+            {meta.interviewPrep.questions.slice(0, 5).map((q, i) => (
+              <li key={i} className="rounded-lg border border-border p-2">
+                <p className="font-medium text-foreground">{q.question}</p>
+              </li>
+            ))}
+          </ul>
         ) : null}
-      </section>
+      </AiActionRow>
+
+      <AiActionRow
+        icon={<Mail className="h-4 w-4" />}
+        title="Cold email"
+        description="Outreach draft saved to this application."
+        loading={generatingEmail}
+        action={
+          <Button
+            type="button"
+            size="sm"
+            className="min-w-[88px] px-4"
+            onClick={() => void handleGenerateColdEmail()}
+            disabled={generatingEmail || !form.job_url?.trim()}
+          >
+            {generatingEmail ? <Loader2 className="h-4 w-4 animate-spin" /> : "Run"}
+          </Button>
+        }
+      >
+        {form.generated_email ? (
+          <Textarea readOnly rows={5} value={form.generated_email} className="text-xs" />
+        ) : null}
+      </AiActionRow>
     </div>
   );
 }

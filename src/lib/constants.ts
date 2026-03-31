@@ -17,11 +17,11 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
 };
 
 export const STATUS_COLORS: Record<ApplicationStatus, string> = {
-  saved: "bg-blue-100 text-blue-800 border-blue-300",
-  applied: "bg-indigo-100 text-indigo-800 border-indigo-300",
-  interview: "bg-purple-100 text-purple-800 border-purple-300",
-  offer: "bg-green-100 text-green-800 border-green-300",
-  rejected: "bg-red-100 text-red-800 border-red-300",
+  saved: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  applied: "bg-orange-400/10 text-orange-300 border-orange-400/20",
+  interview: "bg-amber-300/10 text-amber-200 border-amber-300/20",
+  offer: "bg-green-400/10 text-green-400 border-green-400/20",
+  rejected: "bg-red-400/10 text-red-400 border-red-400/20",
 };
 
 export const SKILL_CATEGORIES = [

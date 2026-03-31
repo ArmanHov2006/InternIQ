@@ -19,7 +19,7 @@ export const TopLoader = () => {
       {active ? (
         <motion.div
           aria-hidden
-          className="pointer-events-none fixed left-0 right-0 top-0 z-[120] h-[2px] bg-gradient-to-r from-primary via-accent to-accent-cyan"
+          className="pointer-events-none fixed left-0 right-0 top-0 z-[120] h-[2px] bg-gradient-to-r from-primary via-accent to-accent-warm"
           initial={{ scaleX: 0, opacity: 0.85 }}
           animate={{ scaleX: 1, opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 0.2 } }}

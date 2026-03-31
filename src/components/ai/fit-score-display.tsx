@@ -24,12 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  GapGlyph,
-  IconFrame,
-  StrengthGlyph,
-  SuggestionGlyph,
-} from "@/components/ui/icons/premium-icons";
+import { GapGlyph, IconFrame, StrengthGlyph, SuggestionGlyph } from "@/components/ui/icons/premium-icons";
 
 export type AnalyzeResult = {
   fit_score: number;
@@ -61,17 +56,8 @@ const parseApiError = (payload: unknown, fallback: string): string => {
   return fallback;
 };
 
-const scoreColorClass = (score: number): string => {
-  if (score >= 70) return "text-green-600";
-  if (score >= 40) return "text-yellow-600";
-  return "text-red-600";
-};
-
-const scoreStrokeClass = (score: number): string => {
-  if (score >= 70) return "stroke-green-600";
-  if (score >= 40) return "stroke-yellow-600";
-  return "stroke-red-600";
-};
+const panelClass =
+  "space-y-2 rounded-lg border border-border bg-card p-3 text-sm text-foreground";
 
 export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitScoreDisplayProps) {
   const [saveOpen, setSaveOpen] = useState(false);
@@ -84,17 +70,11 @@ export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitSc
   const [role, setRole] = useState("");
   const [personalNote, setPersonalNote] = useState("");
 
-  const radius = 58;
-  const circumference = 2 * Math.PI * radius;
   const normalizedScore = Math.max(0, Math.min(100, result.fit_score));
-  const progress = circumference - (normalizedScore / 100) * circumference;
 
   const analysisText = useMemo(() => {
     return JSON.stringify(result.analysis);
   }, [result.analysis]);
-
-  const stickyNoteClass =
-    "rounded-md border border-amber-300 bg-amber-50 p-3 shadow-sm";
 
   const openSaveDialog = async () => {
     setSaveOpen(true);
@@ -189,80 +169,57 @@ export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitSc
   };
 
   return (
-    <Card>
+    <Card className="border-border shadow-glow-sm">
       <CardHeader>
-        <CardTitle>Fit Analysis</CardTitle>
+        <CardTitle className="text-lg font-semibold">Fit analysis</CardTitle>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex justify-center">
-          <div className="relative h-36 w-36">
-            <svg className="h-36 w-36 -rotate-90" viewBox="0 0 140 140" aria-hidden>
-              <circle cx="70" cy="70" r={radius} strokeWidth="12" className="fill-none stroke-muted" />
-              <circle
-                cx="70"
-                cy="70"
-                r={radius}
-                strokeWidth="12"
-                strokeLinecap="round"
-                className={`fill-none ${scoreStrokeClass(normalizedScore)}`}
-                strokeDasharray={circumference}
-                strokeDashoffset={progress}
-              />
-            </svg>
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <p className={`text-3xl font-bold ${scoreColorClass(normalizedScore)}`}>
-                  {normalizedScore}
-                </p>
-                <p className="text-xs text-muted-foreground">out of 100</p>
-              </div>
-            </div>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6A2B] to-[#FF8A50] font-mono text-xl font-bold tabular-nums text-white shadow-[0_0_24px_rgba(255,106,43,0.15)]">
+            {normalizedScore}
+          </div>
+          <div className="min-w-0 flex-1 space-y-2">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Summary</p>
+            <p className="text-sm leading-relaxed text-muted-foreground">{result.analysis.summary}</p>
           </div>
         </div>
 
-        <div className={stickyNoteClass}>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Summary
-          </p>
-          <p className="text-sm text-amber-900">{result.analysis.summary}</p>
-        </div>
-
-        <section className={`space-y-2 ${stickyNoteClass}`}>
+        <section className={panelClass}>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <IconFrame className="h-6 w-6 rounded-md border-emerald-400/30 bg-emerald-500/10 text-emerald-300">
+            <IconFrame className="h-6 w-6 rounded-md border-primary/25 bg-primary/10 text-primary">
               <StrengthGlyph />
             </IconFrame>
             Strengths
           </h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {result.analysis.strengths.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </section>
 
-        <section className={`space-y-2 ${stickyNoteClass}`}>
+        <section className={panelClass}>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <IconFrame className="h-6 w-6 rounded-md border-rose-400/30 bg-rose-500/10 text-rose-300">
+            <IconFrame className="h-6 w-6 rounded-md border-primary/25 bg-primary/10 text-primary">
               <GapGlyph />
             </IconFrame>
             Gaps
           </h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {result.analysis.gaps.map((item) => (
               <li key={item}>{item}</li>
             ))}
           </ul>
         </section>
 
-        <section className={`space-y-2 ${stickyNoteClass}`}>
+        <section className={panelClass}>
           <h3 className="flex items-center gap-2 text-sm font-semibold">
-            <IconFrame className="h-6 w-6 rounded-md border-amber-300/30 bg-amber-500/10 text-amber-200">
+            <IconFrame className="h-6 w-6 rounded-md border-primary/25 bg-primary/10 text-primary">
               <SuggestionGlyph />
             </IconFrame>
             Suggestions
           </h3>
-          <ul className="list-disc space-y-1 pl-5 text-sm text-amber-900">
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
             {result.analysis.suggestions.map((item) => (
               <li key={item}>{item}</li>
             ))}
@@ -277,12 +234,10 @@ export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitSc
       </CardContent>
 
       <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
-        <DialogContent className="sm:max-w-[600px] w-full">
+        <DialogContent className="w-full sm:max-w-[600px]">
           <DialogHeader>
             <DialogTitle>Save Analysis</DialogTitle>
-            <DialogDescription>
-              Save this fit score to a new or existing application.
-            </DialogDescription>
+            <DialogDescription>Save this fit score to a new or existing application.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
@@ -339,13 +294,13 @@ export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitSc
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="analysis-personal-note">Personal Note (post-it)</Label>
+              <Label htmlFor="analysis-personal-note">Personal note</Label>
               <Textarea
                 id="analysis-personal-note"
                 rows={3}
                 value={personalNote}
                 onChange={(e) => setPersonalNote(e.target.value)}
-                placeholder="Add your own quick note to save with this analysis..."
+                placeholder="Optional note to save with this analysis..."
               />
             </div>
           </div>

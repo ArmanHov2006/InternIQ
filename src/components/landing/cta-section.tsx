@@ -31,14 +31,14 @@ export const CtaSection = () => {
         <motion.div 
           animate={{ scale: [1, 1.15, 1] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-[20%] left-[45%] h-36 w-36 rounded-full bg-accent-cyan/15 blur-[70px]" 
+          className="absolute bottom-[20%] left-[45%] h-36 w-36 rounded-full bg-accent-warm/15 blur-[70px]" 
         />
       </div>
       
       <SectionReveal>
         <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10">
           {/* Gradient mesh background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent-cyan/10" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent-warm/10" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,oklch(0.65_0.25_265_/_15%),transparent_50%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,oklch(0.75_0.15_195_/_12%),transparent_50%)]" />
           

@@ -6,13 +6,14 @@ import { toast } from "sonner";
 import { GmailAutomationSection } from "@/components/settings/gmail-automation-section";
 import { ProfileSettingsSection } from "@/components/settings/profile-settings-section";
 import { ResumesSection } from "@/components/settings/resumes-section";
+import { getGmailOauthToast, getSettingsSectionFromSearch } from "@/lib/navigation/dashboard-routes";
 
 export default function SettingsPage() {
   const searchParams = useSearchParams();
   const oauthToastDone = useRef(false);
 
   useEffect(() => {
-    const section = searchParams.get("section");
+    const section = getSettingsSectionFromSearch(new URLSearchParams(searchParams.toString()));
     const id = section === "integrations" ? "integrations" : section === "profile" ? "profile" : null;
     if (!id) return;
     requestAnimationFrame(() => {
@@ -22,15 +23,11 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (oauthToastDone.current) return;
-    const connected = searchParams.get("connected");
-    const error = searchParams.get("error");
-    if (connected === "1") {
-      oauthToastDone.current = true;
-      toast.success("Gmail connected.");
-    } else if (error) {
-      oauthToastDone.current = true;
-      toast.error(`Gmail: ${error.replace(/_/g, " ")}`);
-    }
+    const nextToast = getGmailOauthToast(new URLSearchParams(searchParams.toString()));
+    if (!nextToast) return;
+    oauthToastDone.current = true;
+    if (nextToast.type === "success") toast.success(nextToast.message);
+    else toast.error(nextToast.message);
   }, [searchParams]);
 
   return (

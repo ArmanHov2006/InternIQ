@@ -25,6 +25,7 @@ import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanCardFace } from "@/components/kanban/kanban-card";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import { KanbanFilters } from "@/components/kanban/kanban-filters";
+import { buildPipelinePath, getPipelineAppIdFromSearch } from "@/lib/navigation/dashboard-routes";
 import { useKanbanStore, type KanbanCardData, type StatusId } from "@/stores/kanban-store";
 import type { Application } from "@/types/database";
 
@@ -57,15 +58,11 @@ export const KanbanBoard = () => {
   const router = useRouter();
 
   const replacePipelineAppQuery = (appId: string | null) => {
-    const params = new URLSearchParams(searchParams.toString());
-    if (appId) params.set("app", appId);
-    else params.delete("app");
-    const q = params.toString();
-    router.replace(q ? `/dashboard/pipeline?${q}` : "/dashboard/pipeline", { scroll: false });
+    router.replace(buildPipelinePath(new URLSearchParams(searchParams.toString()), appId), { scroll: false });
   };
 
   useEffect(() => {
-    const appId = searchParams.get("app");
+    const appId = getPipelineAppIdFromSearch(new URLSearchParams(searchParams.toString()));
     if (appId) setSelectedId(appId);
   }, [searchParams]);
 
@@ -265,7 +262,7 @@ export const KanbanBoard = () => {
         particleCount: 18,
         spread: 50,
         origin: { x: (cardRect.left + cardRect.width / 2) / window.innerWidth, y: cardRect.top / window.innerHeight },
-        colors: [columns[to].color, "oklch(0.7 0.2 300)"],
+        colors: [columns[to].color, "#FF8A50"],
         startVelocity: 20,
         gravity: 0.8,
         ticks: 60,
@@ -415,7 +412,7 @@ export const KanbanBoard = () => {
                 date={activeCard.date}
                 location={activeCard.location}
                 fitScore={activeCard.fitScore}
-                className="border-white/20 bg-white/[0.05]"
+                className="border-border bg-card"
               />
             </motion.div>
           ) : null}

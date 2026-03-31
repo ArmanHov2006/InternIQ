@@ -579,7 +579,7 @@ export async function POST(request: Request) {
       // Auth unavailable
     }
 
-    const rateLimited = checkAiRateLimit(request, userId);
+    const rateLimited = await checkAiRateLimit(request, userId);
     if (rateLimited) return rateLimited;
 
     const fastApiUrl =

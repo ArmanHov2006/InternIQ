@@ -65,7 +65,7 @@ export default function PipelinePage() {
             Your application workspace — open a card for details and AI actions.
           </p>
         </div>
-        <Button variant="outline" size="sm" className="gap-2" onClick={() => setDialogOpen(true)}>
+        <Button size="sm" className="gap-2" onClick={() => setDialogOpen(true)}>
           <Plus className="h-4 w-4" />
           Add application
         </Button>

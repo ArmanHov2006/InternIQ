@@ -1,8 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import type { Application } from "@/types/database";
 import { GlassCard } from "@/components/ui/glass-card";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const pipelineOrder: Application["status"][] = ["saved", "applied", "interview", "offer", "rejected"];
 
@@ -38,15 +48,43 @@ function weeklyVelocity(apps: Application[]) {
   return buckets;
 }
 
+type Resume = {
+  id: string;
+  parsed_text: string;
+  is_primary: boolean;
+};
+
+const scorePriority = (app: Application): number => {
+  const now = Date.now();
+  const ageDays = Math.max(0, (now - new Date(app.created_at).getTime()) / (24 * 60 * 60 * 1000));
+  const freshnessBoost = Math.max(0, 20 - ageDays);
+  const fit = typeof app.fit_score === "number" ? app.fit_score : 45;
+  const stageWeight =
+    app.status === "saved" ? 25 : app.status === "applied" ? 18 : app.status === "interview" ? 15 : app.status === "offer" ? 5 : 0;
+  const hasJobUrl = app.job_url?.trim() ? 8 : 0;
+  return Math.round(fit * 0.55 + freshnessBoost + stageWeight + hasJobUrl);
+};
+
 export default function InsightsPage() {
   const [applications, setApplications] = useState<Application[]>([]);
+  const [resumes, setResumes] = useState<Resume[]>([]);
+  const [selectedId, setSelectedId] = useState<string>("");
+  const [generatingPack, setGeneratingPack] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/applications", { credentials: "same-origin", headers: { Accept: "application/json" } });
-        if (res.ok) setApplications((await res.json()) as Application[]);
+        const [appRes, resumeRes] = await Promise.all([
+          fetch("/api/applications", { credentials: "same-origin", headers: { Accept: "application/json" } }),
+          fetch("/api/resumes", { credentials: "same-origin", headers: { Accept: "application/json" } }),
+        ]);
+        if (appRes.ok) {
+          const nextApps = (await appRes.json()) as Application[];
+          setApplications(nextApps);
+          if (nextApps.length) setSelectedId((current) => current || nextApps[0].id);
+        }
+        if (resumeRes.ok) setResumes((await resumeRes.json()) as Resume[]);
       } finally {
         setLoading(false);
       }
@@ -70,6 +108,124 @@ export default function InsightsPage() {
     const sum = applications.reduce((acc, a) => acc + (now - new Date(a.updated_at).getTime()), 0);
     return Math.round(sum / applications.length / (24 * 60 * 60 * 1000));
   }, [applications]);
+
+  const prioritized = useMemo(
+    () =>
+      [...applications]
+        .map((app) => ({ app, score: scorePriority(app) }))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5),
+    [applications]
+  );
+
+  const followUps = useMemo(() => {
+    const now = Date.now();
+    return applications
+      .filter((app) => app.status === "applied" || app.status === "interview")
+      .map((app) => {
+        const lastTouch = new Date(app.updated_at).getTime();
+        const staleDays = Math.floor((now - lastTouch) / (24 * 60 * 60 * 1000));
+        return { app, staleDays };
+      })
+      .filter((entry) => entry.staleDays >= 5)
+      .sort((a, b) => b.staleDays - a.staleDays)
+      .slice(0, 5);
+  }, [applications]);
+
+  const selectedApplication = useMemo(
+    () => applications.find((app) => app.id === selectedId) ?? null,
+    [applications, selectedId]
+  );
+
+  const primaryResumeText = useMemo(() => {
+    const primary = resumes.find((r) => r.is_primary) ?? resumes[0];
+    return primary?.parsed_text?.trim() ?? "";
+  }, [resumes]);
+
+  const generateApplicationPack = async () => {
+    if (!selectedApplication) return;
+    if (!selectedApplication.job_url?.trim()) {
+      toast.error("Selected application needs a job URL.");
+      return;
+    }
+    if (!primaryResumeText) {
+      toast.error("Upload a resume in Settings before generating a pack.");
+      return;
+    }
+    setGeneratingPack(true);
+    try {
+      const [analyzeRes, emailRes, coverRes] = await Promise.all([
+        fetch("/api/analyze", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({ job_url: selectedApplication.job_url, resume_text: primaryResumeText }),
+        }),
+        fetch("/api/email/generate", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            job_url: selectedApplication.job_url,
+            resume_text: primaryResumeText,
+            company: selectedApplication.company,
+            role: selectedApplication.role,
+            contact_name: selectedApplication.contact_name || undefined,
+          }),
+        }),
+        fetch("/api/cover-letter/generate", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", Accept: "application/json" },
+          body: JSON.stringify({
+            job_url: selectedApplication.job_url,
+            resume_text: primaryResumeText,
+            company: selectedApplication.company,
+            role: selectedApplication.role,
+          }),
+        }),
+      ]);
+      const analyzePayload = (await analyzeRes.json()) as { fit_score?: number; analysis?: unknown; error?: string };
+      const emailPayload = (await emailRes.json()) as { email?: string; subject?: string; error?: string };
+      const coverPayload = (await coverRes.json()) as Record<string, unknown> & { error?: string };
+      if (!analyzeRes.ok) throw new Error(analyzePayload.error || "Analyze failed.");
+      if (!emailRes.ok) throw new Error(emailPayload.error || "Email generation failed.");
+      if (!coverRes.ok) throw new Error(coverPayload.error || "Cover letter generation failed.");
+
+      const nextMeta = {
+        ...(selectedApplication.ai_metadata && typeof selectedApplication.ai_metadata === "object"
+          ? selectedApplication.ai_metadata
+          : {}),
+        coverLetter: {
+          generated_at: new Date().toISOString(),
+          result: coverPayload,
+        },
+      };
+
+      const updateRes = await fetch("/api/applications", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          id: selectedApplication.id,
+          fit_score: analyzePayload.fit_score ?? null,
+          fit_analysis: typeof analyzePayload.analysis === "string" ? analyzePayload.analysis : JSON.stringify(analyzePayload.analysis ?? {}),
+          generated_email:
+            typeof emailPayload.email === "string" ? emailPayload.email : typeof emailPayload.subject === "string" ? emailPayload.subject : "",
+          ai_metadata: nextMeta,
+        }),
+      });
+      const updated = (await updateRes.json()) as Application | { error?: string };
+      if (!updateRes.ok) throw new Error((updated as { error?: string }).error || "Failed to save generated pack.");
+      const updatedApp = updated as Application;
+      setApplications((prev) => prev.map((app) => (app.id === updatedApp.id ? updatedApp : app)));
+      toast.success("Application pack generated and saved.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Could not generate application pack.");
+    } finally {
+      setGeneratingPack(false);
+    }
+  };
 
   return (
     <div className="space-y-8">
@@ -154,6 +310,71 @@ export default function InsightsPage() {
             <p className="mt-3 text-sm text-muted-foreground">
               Average days since last update across all cards: <strong className="text-foreground">{avgDaysSinceUpdate}</strong>
             </p>
+          </GlassCard>
+
+          <GlassCard className="p-6">
+            <h2 className="text-base font-semibold">AI job fit prioritizer</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Recommended next applications based on fit, freshness, and stage.</p>
+            <ul className="mt-4 space-y-2">
+              {prioritized.map(({ app, score }) => (
+                <li key={app.id} className="flex items-center justify-between rounded-md border border-border px-3 py-2 text-sm">
+                  <div>
+                    <p className="font-medium">{app.company}</p>
+                    <p className="text-xs text-muted-foreground">{app.role}</p>
+                  </div>
+                  <span className="rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
+                    Priority {score}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </GlassCard>
+
+          <GlassCard className="p-6">
+            <h2 className="text-base font-semibold">Batch prep tools</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Select one application and generate a full preparation pack.</p>
+            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+              <div className="space-y-1.5">
+                <Label>Application</Label>
+                <Select value={selectedId} onValueChange={setSelectedId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select application" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {applications.map((app) => (
+                      <SelectItem key={app.id} value={app.id}>
+                        {app.company} — {app.role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button type="button" className="self-end" disabled={generatingPack || !selectedApplication} onClick={() => void generateApplicationPack()}>
+                {generatingPack ? "Generating..." : "Generate Application Pack"}
+              </Button>
+            </div>
+          </GlassCard>
+
+          <GlassCard className="p-6">
+            <h2 className="text-base font-semibold">Follow-up copilot</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">Applications that likely need follow-up based on inactivity.</p>
+            {followUps.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">No urgent follow-ups detected.</p>
+            ) : (
+              <ul className="mt-4 space-y-2">
+                {followUps.map(({ app, staleDays }) => (
+                  <li key={app.id} className="rounded-md border border-border px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{app.company} — {app.role}</p>
+                      <span className="text-xs text-muted-foreground">{staleDays}d since update</span>
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Suggested action: send a concise follow-up mentioning continued interest and one role-specific value point.
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </GlassCard>
         </>
       )}

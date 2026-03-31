@@ -56,9 +56,9 @@ const HeroVisual = () => (
         <motion.div
           animate={{ y: [0, -4, 0] }}
           transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="flex-1 rounded-2xl border border-accent-cyan/30 bg-gradient-to-br from-accent-cyan/15 to-accent-cyan/5 backdrop-blur-xl p-4"
+          className="flex-1 rounded-2xl border border-accent-warm/30 bg-gradient-to-br from-accent-warm/15 to-accent-warm/5 backdrop-blur-xl p-4"
         >
-          <div className="flex items-center gap-2 text-accent-cyan">
+          <div className="flex items-center gap-2 text-accent-warm">
             <TrendingUp className="h-4 w-4" />
             <span className="text-xs font-medium">Response Rate</span>
           </div>
@@ -68,7 +68,7 @@ const HeroVisual = () => (
               initial={{ width: 0 }}
               animate={{ width: "89%" }}
               transition={{ duration: 2, delay: 0.5 }}
-              className="h-full rounded-full bg-gradient-to-r from-accent-cyan to-accent"
+              className="h-full rounded-full bg-gradient-to-r from-accent-warm to-accent"
             />
           </div>
         </motion.div>
@@ -131,7 +131,7 @@ export const HeroSection = () => {
         <motion.div 
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-[45%] top-[40%] h-[200px] w-[200px] sm:h-[300px] sm:w-[300px] -translate-x-1/2 rounded-full bg-accent-cyan/10 blur-[80px] sm:blur-[100px]" 
+          className="absolute left-[45%] top-[40%] h-[200px] w-[200px] sm:h-[300px] sm:w-[300px] -translate-x-1/2 rounded-full bg-accent-warm/10 blur-[80px] sm:blur-[100px]" 
         />
       </div>
 

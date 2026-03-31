@@ -7,7 +7,7 @@
    - `NEXT_PUBLIC_GMAIL_AUTOMATION_ENABLED=true`
    - `GMAIL_AUTOMATION_ENABLED=true`
 3. Keep each user connection in `automation_mode = suggestions_only`.
-4. Verify suggestions arrive in `/dashboard/automation`.
+4. Verify suggestions and integration state in `/dashboard/settings?section=integrations`.
 
 ## Stage 1: Hybrid mode
 

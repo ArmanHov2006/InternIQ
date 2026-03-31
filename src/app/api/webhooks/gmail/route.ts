@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import crypto from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
   fetchHistoryMessageIds,
@@ -13,19 +14,49 @@ export const runtime = "nodejs";
 const getSecretFromHeaders = (headers: Headers): string =>
   headers.get("x-interniq-webhook-secret") || headers.get("x-webhook-secret") || "";
 
+const MAX_SKEW_SECONDS = 300;
+
+const safeEqual = (a: string, b: string): boolean => {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+};
+
+const verifySignedWebhook = (request: Request, rawBody: string, secret: string): boolean => {
+  const ts = request.headers.get("x-interniq-webhook-ts") || "";
+  const sig = request.headers.get("x-interniq-webhook-signature") || "";
+  if (!ts || !sig) return false;
+
+  const parsedTs = Number(ts);
+  if (!Number.isFinite(parsedTs)) return false;
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - parsedTs) > MAX_SKEW_SECONDS) return false;
+
+  const digest = crypto.createHmac("sha256", secret).update(`${ts}.${rawBody}`).digest("hex");
+  return safeEqual(digest, sig);
+};
+
 export async function POST(request: Request) {
   if (!isGmailAutomationEnabled()) {
     return NextResponse.json({ ok: true, ignored: true, reason: "Feature disabled." });
   }
   const expectedSecret = process.env.GMAIL_WEBHOOK_SECRET;
+  let rawBody = "";
+  try {
+    rawBody = await request.text();
+  } catch {
+    return NextResponse.json({ error: "Invalid webhook payload." }, { status: 400 });
+  }
   const providedSecret = getSecretFromHeaders(request.headers);
-  if (!expectedSecret || providedSecret !== expectedSecret) {
+  const signedValid = expectedSecret ? verifySignedWebhook(request, rawBody, expectedSecret) : false;
+  const secretValid = expectedSecret ? safeEqual(providedSecret, expectedSecret) : false;
+  if (!expectedSecret || (!signedValid && !secretValid)) {
     return NextResponse.json({ error: "Unauthorized webhook." }, { status: 401 });
   }
-
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid webhook payload." }, { status: 400 });
   }

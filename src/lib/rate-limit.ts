@@ -6,6 +6,8 @@
 import { NextResponse } from "next/server";
 
 const buckets = new Map<string, number[]>();
+const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
+const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
 const MAX_MAP_KEYS = 50_000;
 
@@ -104,9 +106,52 @@ export function aiRateLimitExceededResponse(result: RateLimitResult): NextRespon
 }
 
 /** Returns 429 response if over limit, otherwise null. */
-export function checkAiRateLimit(request: Request, userId: string | null): NextResponse | null {
+async function callUpstash(parts: string[]): Promise<unknown> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return null;
+  const url = `${UPSTASH_URL.replace(/\/$/, "")}/${parts.map((p) => encodeURIComponent(p)).join("/")}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${UPSTASH_TOKEN}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    throw new Error(`Upstash request failed: ${res.status}`);
+  }
+  const payload = (await res.json()) as { result?: unknown };
+  return payload.result;
+}
+
+async function rateLimitDistributed(
+  key: string,
+  windowMs: number,
+  maxRequests: number
+): Promise<RateLimitResult | null> {
+  if (!UPSTASH_URL || !UPSTASH_TOKEN) return null;
+  const now = Date.now();
+  const windowBucket = Math.floor(now / windowMs);
+  const scopedKey = `rl:${key}:${windowBucket}`;
+
+  const count = Number(await callUpstash(["incr", scopedKey]));
+  if (!Number.isFinite(count)) return null;
+  if (count === 1) {
+    await callUpstash(["pexpire", scopedKey, String(windowMs)]);
+  }
+  const ttl = Number(await callUpstash(["pttl", scopedKey]));
+  const resetAt = now + (Number.isFinite(ttl) && ttl > 0 ? ttl : windowMs);
+
+  if (count > maxRequests) {
+    return { success: false, remaining: 0, resetAt };
+  }
+  return { success: true, remaining: Math.max(0, maxRequests - count), resetAt };
+}
+
+export async function checkAiRateLimit(request: Request, userId: string | null): Promise<NextResponse | null> {
   const key = aiRateLimitKey(request, userId);
-  const result = rateLimit(key, AI_RATE_WINDOW_MS, AI_RATE_MAX);
+  const result =
+    (await rateLimitDistributed(key, AI_RATE_WINDOW_MS, AI_RATE_MAX)) ??
+    rateLimit(key, AI_RATE_WINDOW_MS, AI_RATE_MAX);
   if (!result.success) {
     return aiRateLimitExceededResponse(result);
   }

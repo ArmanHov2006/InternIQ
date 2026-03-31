@@ -22,7 +22,7 @@ export const AssistantChatIcon = ({ className }: Props) => {
         <linearGradient id={gradId} x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stopColor="var(--primary)" />
           <stop offset="50%" stopColor="var(--accent)" />
-          <stop offset="100%" stopColor="var(--accent-cyan)" />
+          <stop offset="100%" stopColor="var(--accent-warm)" />
         </linearGradient>
       </defs>
       <path

@@ -8,11 +8,11 @@ export const SkeletonShimmer = ({ className }: SkeletonShimmerProps) => {
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-xl bg-white/[0.04] border border-white/[0.08]",
+        "relative overflow-hidden rounded-xl bg-muted border border-border",
         className
       )}
     >
-      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-0 -translate-x-full animate-shimmer bg-gradient-to-r from-transparent via-foreground/5 to-transparent" />
     </div>
   );
 };

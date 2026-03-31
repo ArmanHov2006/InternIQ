@@ -3,7 +3,7 @@
 import { CSS } from "@dnd-kit/utilities";
 import { useSortable } from "@dnd-kit/sortable";
 import { memo, useRef } from "react";
-import { GripVertical, Pencil, Trash2 } from "lucide-react";
+import { GripVertical, Pencil, Sparkles, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { StatusId } from "@/stores/kanban-store";
 
@@ -15,6 +15,7 @@ interface KanbanCardProps {
   date?: string;
   location?: string;
   fitScore?: number;
+  aiCompletedCount?: number;
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -29,6 +30,7 @@ interface KanbanCardFaceProps {
   date?: string;
   location?: string;
   fitScore?: number;
+  aiCompletedCount?: number;
   onEdit?: () => void;
   onDelete?: () => void;
   compact?: boolean;
@@ -41,6 +43,7 @@ export const KanbanCardFace = memo(({
   date,
   location,
   fitScore,
+  aiCompletedCount = 0,
   onEdit,
   onDelete,
   compact = false,
@@ -49,30 +52,38 @@ export const KanbanCardFace = memo(({
   return (
     <article
       className={cn(
-        "glass group rounded-xl border-l-2 border-l-primary p-3 transition-all",
+        "group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors duration-100 hover:border-primary/20",
         className
       )}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold">{company}</p>
-          <p className="text-sm text-muted-foreground">{role}</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[13px] font-semibold text-foreground">{company}</p>
+          <p className="text-sm font-medium text-muted-foreground">{role}</p>
         </div>
         {typeof fitScore === "number" ? (
-          <span className="rounded-full bg-gradient-to-r from-primary/30 to-accent/30 px-2 py-0.5 text-xs">
-            {fitScore}
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+            <Sparkles className="h-3 w-3" aria-hidden />
+            {fitScore}%
           </span>
         ) : null}
       </div>
       {!compact ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          {date} · {location}
-        </p>
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
+          <p>{date} · {location}</p>
+          {aiCompletedCount > 0 ? (
+            <div className="flex items-center gap-1" aria-label={`${aiCompletedCount} AI actions completed`}>
+              {Array.from({ length: Math.min(aiCompletedCount, 5) }).map((_, idx) => (
+                <span key={idx} className="h-1.5 w-1.5 rounded-full bg-primary/70" />
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
       <div className="mt-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
         <button
           type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-white/10 hover:text-foreground"
+          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
@@ -108,6 +119,7 @@ export const KanbanCard = memo(({
   date,
   location,
   fitScore,
+  aiCompletedCount,
   onClick,
   onEdit,
   onDelete,
@@ -154,8 +166,8 @@ export const KanbanCard = memo(({
       data-cursor="drag"
       data-card-id={id}
       className={cn(
-        "cursor-grab select-none touch-none rounded-xl transition-transform duration-150 active:cursor-grabbing",
-        !sortable.isDragging && !dragging && "hover:-translate-y-0.5 hover:shadow-glow-sm",
+        "cursor-grab select-none touch-none rounded-xl transition-transform duration-100 active:cursor-grabbing",
+        !sortable.isDragging && !dragging && "hover:-translate-y-px",
         sortable.isDragging && "opacity-30 blur-[1px]",
         dragging && "scale-[1.01]",
         className
@@ -165,7 +177,7 @@ export const KanbanCard = memo(({
         <button
           type="button"
           className={cn(
-            "absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-white/10 bg-white/[0.03] text-muted-foreground hover:text-foreground",
+            "absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-input text-muted-foreground hover:text-foreground",
             "pointer-events-none opacity-70 md:hidden"
           )}
           aria-label="Drag application card"
@@ -179,6 +191,7 @@ export const KanbanCard = memo(({
           date={date}
           location={location}
           fitScore={fitScore}
+          aiCompletedCount={aiCompletedCount}
           onEdit={onEdit}
           onDelete={onDelete}
           compact={compact}

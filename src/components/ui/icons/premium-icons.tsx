@@ -12,7 +12,7 @@ export const IconFrame = ({
 }) => (
   <span
     className={cn(
-      "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 bg-white/[0.06] text-primary shadow-glow-xs",
+      "inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-muted/50 text-primary shadow-glow-xs",
       className
     )}
   >
@@ -21,10 +21,11 @@ export const IconFrame = ({
 );
 
 export const BrandMarkIcon = ({ className, ...props }: IconProps) => (
-  <svg viewBox="0 0 24 24" fill="none" className={cn("h-4 w-4", className)} {...props}>
-    <circle cx="12" cy="12" r="8.5" stroke="currentColor" strokeWidth="1.6" opacity="0.8" />
-    <circle cx="12" cy="12" r="3.2" fill="currentColor" />
-    <path d="M4.5 12h15M12 4.5v15" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+  <svg viewBox="0 0 48 48" fill="none" className={cn("h-4 w-4", className)} {...props}>
+    <rect x="3" y="3" width="42" height="42" rx="5" stroke="currentColor" strokeWidth="3" />
+    <path d="M11 13v24h8V23z" fill="currentColor" />
+    <circle cx="32" cy="25" r="7.5" stroke="currentColor" strokeWidth="3" />
+    <path d="M37 30l6 6" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
   </svg>
 );
 

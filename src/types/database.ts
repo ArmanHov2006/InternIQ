@@ -74,16 +74,24 @@ export interface Application {
   company: string;
   role: string;
   job_url: string;
+  job_description?: string | null;
   status: "saved" | "applied" | "interview" | "offer" | "rejected";
+  source?: "manual" | "extension" | "imported" | "referral" | "automation";
+  board?: string | null;
+  external_job_id?: string | null;
   applied_date: string;
   salary_range: string;
   location: string;
   notes: string;
   fit_score: number | null;
+  match_score?: number | null;
   fit_analysis: string;
   contact_name: string;
   contact_email: string;
   generated_email: string;
+  next_action_at?: string | null;
+  last_contacted_at?: string | null;
+  resume_version_id?: string | null;
   display_order: number;
   last_status_change_source: "manual" | "gmail_auto" | "gmail_confirmed" | "system";
   last_status_change_reason: string;
@@ -101,6 +109,136 @@ export interface Resume {
   file_url: string;
   parsed_text: string;
   is_primary: boolean;
+  created_at: string;
+}
+
+export interface Opportunity {
+  id: string;
+  user_id: string;
+  company: string;
+  role: string;
+  location: string;
+  board: string;
+  source: "manual" | "extension" | "imported" | "recommendation";
+  job_url: string;
+  external_job_id: string | null;
+  salary_range: string;
+  status: "new" | "saved" | "applied" | "archived";
+  employment_type: string;
+  job_description: string;
+  match_score: number | null;
+  match_summary: string;
+  matched_keywords: string[];
+  missing_keywords: string[];
+  application_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SavedSearch {
+  id: string;
+  user_id: string;
+  label: string;
+  query: string;
+  location: string;
+  boards: string[];
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MatchInsight {
+  score: number;
+  summary: string;
+  matched_keywords: string[];
+  missing_keywords: string[];
+}
+
+export interface ApplicationContact {
+  id: string;
+  user_id: string;
+  application_id: string;
+  name: string;
+  email: string;
+  title: string;
+  company: string;
+  relationship_type: "recruiter" | "referrer" | "hiring_manager" | "interviewer" | "other";
+  notes: string;
+  last_contacted_at: string | null;
+  next_follow_up_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationConversation {
+  id: string;
+  user_id: string;
+  application_id: string;
+  contact_id: string | null;
+  channel: "email" | "linkedin" | "phone" | "meeting" | "other";
+  summary: string;
+  direction: "inbound" | "outbound" | "internal";
+  occurred_at: string;
+  created_at: string;
+}
+
+export interface ApplicationReminder {
+  id: string;
+  user_id: string;
+  application_id: string;
+  title: string;
+  due_at: string;
+  status: "pending" | "done" | "dismissed";
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InterviewEvent {
+  id: string;
+  user_id: string;
+  application_id: string;
+  title: string;
+  interview_type: "screen" | "behavioral" | "technical" | "onsite" | "final" | "other";
+  scheduled_at: string;
+  location: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResumeVersion {
+  id: string;
+  user_id: string;
+  application_id: string;
+  resume_id: string | null;
+  label: string;
+  summary: string;
+  keyword_coverage: number | null;
+  targeted_keywords: string[];
+  created_at: string;
+}
+
+export interface ApplicationArtifact {
+  id: string;
+  user_id: string;
+  application_id: string;
+  artifact_type: "proof_pack" | "recruiter_note" | "story_bank" | "company_brief" | "resume_version";
+  title: string;
+  content: string;
+  share_slug: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ApplicationTimelineEvent {
+  id: string;
+  user_id: string;
+  application_id: string;
+  event_type: "status_change" | "contact" | "interview" | "artifact" | "note" | "system";
+  title: string;
+  description: string;
+  occurred_at: string;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
 }
 

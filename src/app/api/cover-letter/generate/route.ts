@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const rateLimited = checkAiRateLimit(request, user.id);
+    const rateLimited = await checkAiRateLimit(request, user.id);
     if (rateLimited) return rateLimited;
 
     const {
