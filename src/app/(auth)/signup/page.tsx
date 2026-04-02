@@ -27,7 +27,6 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ email?: string; password?: string; confirmPassword?: string }>({});
   const router = useRouter();
-  const supabase = createClient();
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,6 +50,7 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
+      const supabase = createClient();
       // Create the auth user first without metadata so DB username generation
       // does not fail on duplicate full names.
       const { data, error } = await supabase.auth.signUp({
