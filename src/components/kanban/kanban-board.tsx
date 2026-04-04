@@ -98,6 +98,38 @@ export const KanbanBoard = () => {
     }
   };
 
+  const buildRestorePayload = (application: Application, displayOrder: number) => ({
+    company: application.company,
+    role: application.role,
+    job_url: application.job_url,
+    job_description: application.job_description ?? "",
+    status: application.status,
+    source: application.source ?? "manual",
+    board: application.board ?? "",
+    external_job_id: application.external_job_id ?? "",
+    location: application.location,
+    salary_range: application.salary_range,
+    notes: application.notes,
+    contact_name: application.contact_name,
+    contact_email: application.contact_email,
+    fit_score: application.fit_score,
+    match_score: application.match_score ?? null,
+    fit_analysis: application.fit_analysis,
+    generated_email: application.generated_email,
+    next_action_at: application.next_action_at ?? null,
+    last_contacted_at: application.last_contacted_at ?? null,
+    resume_version_id: application.resume_version_id ?? null,
+    display_order: Math.max(displayOrder, 0),
+    applied_date: application.applied_date,
+    last_status_change_source: application.last_status_change_source,
+    last_status_change_reason: application.last_status_change_reason,
+    last_status_change_at: application.last_status_change_at,
+    ai_metadata:
+      application.ai_metadata && typeof application.ai_metadata === "object"
+        ? application.ai_metadata
+        : {},
+  });
+
   const collisionDetection: CollisionDetection = (args) => {
     const pointerCollisions = pointerWithin(args);
     if (pointerCollisions.length > 0) {
@@ -292,27 +324,24 @@ export const KanbanBoard = () => {
   const handleDeleteCard = async (card: KanbanCardData) => {
     const from = findStatus(card.id);
     if (!from) return;
+    const application = applicationsById[card.id] ?? null;
     const previousColumns = JSON.parse(JSON.stringify(columns)) as typeof columns;
     const previousCards = { ...cards };
     const previousIndex = columns[from].cardIds.indexOf(card.id);
     removeById(card.id);
 
     const restoreDeletedCard = async () => {
+      if (!application) {
+        restoreBoard(previousColumns, previousCards);
+        toast.error("Undo is unavailable until the full application record finishes loading.");
+        return;
+      }
       try {
         const response = await fetch("/api/applications", {
           method: "POST",
           headers: { "Content-Type": "application/json", Accept: "application/json" },
           credentials: "same-origin",
-          body: JSON.stringify({
-            company: card.company,
-            role: card.role,
-            status: from,
-            location: card.location,
-            notes: card.notes,
-            applied_date: card.date || null,
-            fit_score: card.fitScore ?? null,
-            display_order: Math.max(previousIndex, 0),
-          }),
+          body: JSON.stringify(buildRestorePayload(application, previousIndex)),
         });
         if (!response.ok) throw new Error(await parseApiError(response, "Could not undo delete."));
         const restored = (await response.json()) as Application;
@@ -338,14 +367,18 @@ export const KanbanBoard = () => {
         }
         return current;
       });
-      toast.success("Application deleted", {
-        action: {
-          label: "Undo",
-          onClick: () => {
-            void restoreDeletedCard();
+      if (application) {
+        toast.success("Application deleted", {
+          action: {
+            label: "Undo",
+            onClick: () => {
+              void restoreDeletedCard();
+            },
           },
-        },
-      });
+        });
+      } else {
+        toast.success("Application deleted.");
+      }
     } catch (error) {
       restoreBoard(previousColumns, previousCards);
       toast.error(error instanceof Error ? error.message : "Could not delete application.");

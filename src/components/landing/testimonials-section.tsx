@@ -89,8 +89,9 @@ const TestimonialCard = ({ testimonial }: { testimonial: (typeof testimonials)[0
 );
 
 export const TestimonialsSection = () => {
+  const reversedTestimonials = [...testimonials].reverse();
   const marqueeTop = [...testimonials, ...testimonials];
-  const marqueeBottom = [...testimonials.reverse(), ...testimonials.reverse()];
+  const marqueeBottom = [...reversedTestimonials, ...reversedTestimonials];
 
   return (
     <section id="testimonials" className="relative overflow-hidden py-20 sm:py-28">
@@ -123,8 +124,8 @@ export const TestimonialsSection = () => {
           <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-32 bg-gradient-to-r from-background to-transparent" />
           <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-32 bg-gradient-to-l from-background to-transparent" />
           <motion.div 
-            className="flex gap-4"
-            animate={{ x: [0, -1920] }}
+            className="flex w-max gap-4"
+            animate={{ x: ["0%", "-50%"] }}
             transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
           >
             {marqueeTop.map((testimonial, index) => (
@@ -138,8 +139,8 @@ export const TestimonialsSection = () => {
           <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-32 bg-gradient-to-r from-background to-transparent" />
           <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-32 bg-gradient-to-l from-background to-transparent" />
           <motion.div 
-            className="flex gap-4"
-            animate={{ x: [-1920, 0] }}
+            className="flex w-max gap-4"
+            animate={{ x: ["-50%", "0%"] }}
             transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
           >
             {marqueeBottom.map((testimonial, index) => (
