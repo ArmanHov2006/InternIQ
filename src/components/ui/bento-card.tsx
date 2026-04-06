@@ -3,19 +3,16 @@ import { cn } from "@/lib/utils";
 import { GlassCard } from "@/components/ui/glass-card";
 
 interface BentoCardProps {
-  colSpan?: number;
-  rowSpan?: number;
   children: ReactNode;
   className?: string;
 }
 
-export const BentoCard = ({ colSpan = 1, rowSpan = 1, children, className }: BentoCardProps) => {
+/** Marketing bento tile — grid column/row span lives on the parent (`SectionReveal`), not here. */
+export const BentoCard = ({ children, className }: BentoCardProps) => {
   return (
     <GlassCard
       className={cn(
-        "p-5 h-full",
-        colSpan === 2 && "lg:col-span-2",
-        rowSpan === 2 && "lg:row-span-2",
+        "h-full p-5 shadow-sm transition-shadow duration-150 ease-out hover:shadow-md",
         className
       )}
     >

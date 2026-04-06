@@ -47,7 +47,11 @@ export const InteractiveDemo = () => {
     <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={onDragEnd}>
       <div className="grid gap-3 md:grid-cols-3">
         {(Object.keys(columns) as ColumnId[]).map((columnId) => (
-          <div key={columnId} id={columnId} className="glass rounded-xl p-3">
+          <div
+            key={columnId}
+            id={columnId}
+            className="rounded-lg border border-border bg-muted/30 p-3"
+          >
             <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">{columnId}</p>
             <SortableContext items={columns[columnId]} strategy={verticalListSortingStrategy}>
               <div className="space-y-2">
