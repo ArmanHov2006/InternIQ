@@ -37,6 +37,11 @@ export const createDemoOpportunity = (
     application_id: null,
     created_at: createdAt,
     updated_at: createdAt,
+    api_source: null,
+    api_job_id: null,
+    discovery_run_id: null,
+    ai_score: {},
+    posted_at: null,
     ...overrides,
   };
 };
@@ -48,6 +53,8 @@ export const demoOpportunityStore = new Map<string, Opportunity>([
       board: "Company Site",
       location: "New York, NY",
       source: "recommendation",
+      api_source: "remotive",
+      api_job_id: "remotive-demo-1",
     }),
   ],
   [

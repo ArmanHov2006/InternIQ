@@ -1,0 +1,33 @@
+export type JobApiSource = "adzuna" | "remotive" | "greenhouse" | "themuse";
+
+export interface NormalizedJob {
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  salary: string;
+  job_url: string;
+  api_source: JobApiSource;
+  api_job_id: string;
+  is_remote: boolean;
+  posted_at: string | null;
+}
+
+export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
+
+export interface DiscoveryFetchInput {
+  keywords: string[];
+  locations: string[];
+  remotePreference: RemotePreference;
+  roleTypes: string[];
+  excludedCompanies: string[];
+  greenhouseSlugs: string[];
+  /** Adzuna results per page; max 2 pages per run */
+  adzunaMaxPages?: number;
+}
+
+export interface SourceFetchResult {
+  source: JobApiSource;
+  jobs: NormalizedJob[];
+  error?: string;
+}

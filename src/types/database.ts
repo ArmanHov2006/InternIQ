@@ -133,6 +133,41 @@ export interface Opportunity {
   application_id: string | null;
   created_at: string;
   updated_at: string;
+  api_source?: string | null;
+  api_job_id?: string | null;
+  discovery_run_id?: string | null;
+  ai_score?: Record<string, unknown> | null;
+  posted_at?: string | null;
+}
+
+export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
+
+export interface DiscoveryPreferences {
+  user_id: string;
+  keywords: string[];
+  locations: string[];
+  remote_preference: RemotePreference;
+  role_types: string[];
+  excluded_companies: string[];
+  greenhouse_slugs: string[];
+  min_match_score: number;
+  is_active: boolean;
+  last_discovery_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DiscoveryRun {
+  id: string;
+  user_id: string;
+  api_source: "adzuna" | "themuse" | "remotive" | "greenhouse" | "aggregate";
+  query_params: Record<string, unknown>;
+  results_count: number;
+  new_opportunities_count: number;
+  ai_scored_count: number;
+  error_message: string | null;
+  started_at: string;
+  completed_at: string | null;
 }
 
 export interface SavedSearch {

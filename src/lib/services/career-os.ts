@@ -70,6 +70,9 @@ export const buildOpportunityDedupeKey = (input: {
   return `role:${input.company.trim().toLowerCase()}::${input.role.trim().toLowerCase()}`;
 };
 
+export const buildApiDedupeKey = (apiSource: string, apiJobId: string): string =>
+  `${apiSource.trim().toLowerCase()}::${apiJobId.trim().toLowerCase()}`;
+
 const uniqueTopTokens = (value: string, limit = 10): string[] => {
   const counts = new Map<string, number>();
   for (const token of tokenize(value)) {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import type { Opportunity } from "@/types/database";
+import { getResumeAndKeywords } from "@/lib/server/resume-keywords";
 import {
   buildOpportunityDedupeKey,
   computeMatchInsight,
@@ -16,37 +16,35 @@ import {
 } from "@/lib/server/route-utils";
 import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
-const getResumeAndKeywords = async (
-  supabase: ReturnType<typeof createClient>,
-  userId: string
-) => {
-  const [resumeRes, skillRes] = await Promise.all([
-    supabase
-      .from("resumes")
-      .select("parsed_text, is_primary")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false }),
-    supabase.from("skills").select("name").eq("user_id", userId),
-  ]);
+const discoveryFieldsFromBody = (body: Record<string, unknown>) => {
+  const api_source =
+    typeof body.api_source === "string" && body.api_source.trim() ? body.api_source.trim() : null;
+  const api_job_id =
+    typeof body.api_job_id === "string" && body.api_job_id.trim() ? body.api_job_id.trim() : null;
+  const discovery_run_id =
+    typeof body.discovery_run_id === "string" && body.discovery_run_id.trim()
+      ? body.discovery_run_id.trim()
+      : null;
+  const posted_at =
+    typeof body.posted_at === "string" && body.posted_at.trim() ? body.posted_at : null;
+  let ai_score: Record<string, unknown> = {};
+  if (body.ai_score && typeof body.ai_score === "object" && !Array.isArray(body.ai_score)) {
+    ai_score = body.ai_score as Record<string, unknown>;
+  }
+  return { api_source, api_job_id, discovery_run_id, posted_at, ai_score };
+};
 
-  const resumeRows =
-    !resumeRes.error && Array.isArray(resumeRes.data)
-      ? (resumeRes.data as Array<{ parsed_text?: string; is_primary?: boolean }>)
-      : [];
-  const primaryResume =
-    resumeRows.find((row) => row.is_primary && row.parsed_text?.trim()) ??
-    resumeRows.find((row) => row.parsed_text?.trim()) ??
-    null;
-  const profileKeywords =
-    !skillRes.error && Array.isArray(skillRes.data)
-      ? (skillRes.data as Array<{ name?: string }>)
-          .map((row) => row.name?.trim())
-          .filter((value): value is string => Boolean(value))
-      : [];
-
+const mergeDiscoveryPut = (
+  existing: Opportunity,
+  body: Record<string, unknown>
+): Pick<Opportunity, "api_source" | "api_job_id" | "discovery_run_id" | "posted_at" | "ai_score"> => {
+  const d = discoveryFieldsFromBody(body);
   return {
-    resumeText: primaryResume?.parsed_text?.trim() ?? "",
-    profileKeywords,
+    api_source: "api_source" in body ? d.api_source : existing.api_source ?? null,
+    api_job_id: "api_job_id" in body ? d.api_job_id : existing.api_job_id ?? null,
+    discovery_run_id: "discovery_run_id" in body ? d.discovery_run_id : existing.discovery_run_id ?? null,
+    posted_at: "posted_at" in body ? d.posted_at : existing.posted_at ?? null,
+    ai_score: "ai_score" in body ? d.ai_score : existing.ai_score ?? {},
   };
 };
 
@@ -100,6 +98,8 @@ export async function POST(request: Request) {
         ? body.board.trim()
         : inferBoardFromUrl(typeof body.job_url === "string" ? body.job_url : "");
 
+    const disc = discoveryFieldsFromBody(body);
+
     if (!isSupabaseConfigured) {
       const dedupeKey = buildOpportunityDedupeKey({
         company,
@@ -152,6 +152,7 @@ export async function POST(request: Request) {
         application_id: typeof body.application_id === "string" ? body.application_id : null,
         created_at: now,
         updated_at: now,
+        ...disc,
       };
       demoOpportunityStore.set(opportunity.id, opportunity);
       return NextResponse.json(opportunity);
@@ -219,6 +220,7 @@ export async function POST(request: Request) {
         matched_keywords: insight.matched_keywords,
         missing_keywords: insight.missing_keywords,
         application_id: typeof body.application_id === "string" ? body.application_id : null,
+        ...disc,
       })
       .select("*")
       .single();
@@ -253,6 +255,7 @@ export async function POST(request: Request) {
           application_id: typeof body.application_id === "string" ? body.application_id : null,
           created_at: now,
           updated_at: now,
+          ...disc,
         };
         demoOpportunityStore.set(fallback.id, fallback);
         return NextResponse.json(fallback);
@@ -320,6 +323,7 @@ export async function PUT(request: Request) {
         missing_keywords: nextInsight.missing_keywords,
         application_id: typeof body.application_id === "string" ? body.application_id : existing.application_id,
         updated_at: new Date().toISOString(),
+        ...mergeDiscoveryPut(existing, body),
       };
       demoOpportunityStore.set(id, updated);
       return NextResponse.json(updated);
@@ -378,6 +382,7 @@ export async function PUT(request: Request) {
           missing_keywords: fallbackInsight.missing_keywords,
           application_id: typeof body.application_id === "string" ? body.application_id : existing.application_id,
           updated_at: new Date().toISOString(),
+          ...mergeDiscoveryPut(existing, body),
         };
         demoOpportunityStore.set(id, updated);
         return NextResponse.json(updated);
@@ -401,6 +406,8 @@ export async function PUT(request: Request) {
           }
         : computeMatchInsight({ jobDescription: nextDescription, resumeText, profileKeywords });
 
+    const existingRow = existingRes.data as Opportunity;
+
     const { data, error } = await supabase
       .from("opportunities")
       .update({
@@ -409,7 +416,10 @@ export async function PUT(request: Request) {
         location: typeof body.location === "string" ? body.location : existingRes.data.location,
         board: typeof body.board === "string" ? body.board : existingRes.data.board,
         source:
-          body.source === "extension" || body.source === "imported" || body.source === "recommendation"
+          body.source === "extension" ||
+          body.source === "imported" ||
+          body.source === "recommendation" ||
+          body.source === "manual"
             ? body.source
             : existingRes.data.source,
         job_url: typeof body.job_url === "string" ? body.job_url : existingRes.data.job_url,
@@ -428,6 +438,7 @@ export async function PUT(request: Request) {
         matched_keywords: insight.matched_keywords,
         missing_keywords: insight.missing_keywords,
         application_id: typeof body.application_id === "string" ? body.application_id : existingRes.data.application_id,
+        ...mergeDiscoveryPut(existingRow, body),
       })
       .eq("id", id)
       .eq("user_id", user.id)
@@ -467,6 +478,7 @@ export async function PUT(request: Request) {
           missing_keywords: insight.missing_keywords,
           application_id: typeof body.application_id === "string" ? body.application_id : existing.application_id,
           updated_at: new Date().toISOString(),
+          ...mergeDiscoveryPut(existing, body),
         };
         demoOpportunityStore.set(id, updated);
         return NextResponse.json(updated);

@@ -138,6 +138,8 @@ export function ApplicationDrawer({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [fitResult, setFitResult] = useState<AnalyzeResult | null>(null);
+  const [draftAnswers, setDraftAnswers] = useState<string | null>(null);
+  const [draftLoading, setDraftLoading] = useState(false);
   const aiCompletion = useMemo(() => {
     if (!application) return [];
     const meta = application.ai_metadata as Record<string, unknown> | null | undefined;
@@ -155,11 +157,36 @@ export function ApplicationDrawer({
     if (!application) {
       setForm(null);
       setFitResult(null);
+      setDraftAnswers(null);
       return;
     }
     setForm(toFormState(application));
     setFitResult(parseSavedFitResult(application));
   }, [application]);
+
+  useEffect(() => {
+    if (!application?.id || !open) return;
+    let cancelled = false;
+    setDraftLoading(true);
+    fetch(
+      `/api/applications/draft-answers?application_id=${encodeURIComponent(application.id)}`,
+      { credentials: "same-origin" }
+    )
+      .then((r) => r.json())
+      .then((data: { content?: string } | null) => {
+        if (cancelled) return;
+        setDraftAnswers(typeof data?.content === "string" ? data.content : null);
+      })
+      .catch(() => {
+        if (!cancelled) setDraftAnswers(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDraftLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [application?.id, open]);
 
   const fitScoreLabel = useMemo(() => {
     if (!application?.fit_score && application?.fit_score !== 0) return null;
@@ -325,6 +352,12 @@ export function ApplicationDrawer({
               className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Timeline
+            </TabsTrigger>
+            <TabsTrigger
+              value="drafts"
+              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+            >
+              Draft Answers
             </TabsTrigger>
           </TabsList>
 
@@ -589,6 +622,32 @@ export function ApplicationDrawer({
               </div>
 
               <ApplicationCommandCenter application={application} />
+            </div>
+          </TabsContent>
+
+          <TabsContent
+            value="drafts"
+            className="mt-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 data-[state=inactive]:hidden"
+          >
+            <div className="space-y-2">
+              <p className="text-xs text-muted-foreground">
+                Generated for external application forms. Copy sections into the employer site — nothing is submitted
+                automatically.
+              </p>
+              {draftLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                  Loading…
+                </div>
+              ) : draftAnswers ? (
+                <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-4 text-sm leading-relaxed text-foreground">
+                  {draftAnswers}
+                </pre>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No draft answers yet. Use Smart Apply from Discover to generate them.
+                </p>
+              )}
             </div>
           </TabsContent>
         </Tabs>

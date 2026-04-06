@@ -4,12 +4,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/use-auth";
+import { isJobDiscoveryEnabled } from "@/lib/features";
 import {
   AnalyzerGlyph,
   BrandMarkIcon,
+  DiscoverGlyph,
   MoonGlyph,
   OpportunitiesGlyph,
   OverviewGlyph,
@@ -31,6 +33,12 @@ export const dashboardNavItems = [
   { href: "/dashboard/settings", label: "Settings", icon: ProfileGlyph },
 ];
 
+const discoverNavItem = {
+  href: "/dashboard/discover",
+  label: "Discover",
+  icon: DiscoverGlyph,
+} as const;
+
 function isNavActive(pathname: string, href: string): boolean {
   if (href === "/dashboard") {
     return pathname === "/dashboard";
@@ -46,6 +54,18 @@ export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  const navItems = useMemo(() => {
+    const items = [...dashboardNavItems];
+    if (isJobDiscoveryEnabled()) {
+      items.splice(2, 0, {
+        href: discoverNavItem.href,
+        label: discoverNavItem.label,
+        icon: discoverNavItem.icon,
+      });
+    }
+    return items;
   }, []);
 
   const displayName =
@@ -74,7 +94,7 @@ export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
         </Link>
 
         <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto overflow-x-hidden">
-          {dashboardNavItems.map((item) => {
+          {navItems.map((item) => {
             const active = isNavActive(pathname, item.href);
             return (
               <Link

@@ -1,0 +1,166 @@
+import { fetchAdzunaJobs } from "./adzuna";
+import { fetchGreenhouseJobs } from "./greenhouse";
+import { fetchRemotiveJobs } from "./remotive";
+import { fetchTheMuseJobs } from "./themuse";
+import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
+
+export type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
+
+const GREENHOUSE_MAX_SLUGS = 20;
+const FUZZY_JACCARD_MIN = 0.85;
+
+export const normalizeCompanyName = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/\b(inc|llc|ltd|corp|corporation|company|co\.)\b/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokenSet = (value: string): Set<string> =>
+  new Set(
+    value
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((t) => t.length > 2)
+  );
+
+export const titleSimilarity = (a: string, b: string): number => {
+  const A = tokenSet(a);
+  const B = tokenSet(b);
+  let inter = 0;
+  A.forEach((x) => {
+    if (B.has(x)) inter += 1;
+  });
+  const uni = A.size + B.size - inter;
+  return uni === 0 ? 0 : inter / uni;
+};
+
+const passesRemoteFilter = (job: NormalizedJob, pref: RemotePreference): boolean => {
+  if (pref === "any") return true;
+  if (pref === "remote_only") return job.is_remote;
+  if (pref === "onsite") return !job.is_remote || /\b(on-?site|hybrid)\b/i.test(job.location);
+  if (pref === "hybrid") return job.is_remote || /\bhybrid\b/i.test(`${job.location} ${job.description}`);
+  return true;
+};
+
+const passesExcluded = (job: NormalizedJob, excluded: string[]): boolean => {
+  if (excluded.length === 0) return true;
+  const companyNorm = normalizeCompanyName(job.company);
+  return !excluded.some((ex) => {
+    const n = normalizeCompanyName(ex);
+    return n.length > 0 && (companyNorm === n || companyNorm.includes(n) || n.includes(companyNorm));
+  });
+};
+
+/** Drop jobs that fuzzy-duplicate an earlier kept job (same normalized company + high title similarity). */
+export const dedupeNormalizedJobsFuzzy = (jobs: NormalizedJob[]): NormalizedJob[] => {
+  const kept: NormalizedJob[] = [];
+  const seenIds = new Set<string>();
+
+  for (const job of jobs) {
+    const idKey = `${job.api_source}:${job.api_job_id}`;
+    if (seenIds.has(idKey)) continue;
+    seenIds.add(idKey);
+
+    const companyNorm = normalizeCompanyName(job.company);
+    const dup = kept.some(
+      (k) =>
+        normalizeCompanyName(k.company) === companyNorm &&
+        titleSimilarity(k.title, job.title) >= FUZZY_JACCARD_MIN
+    );
+    if (!dup) kept.push(job);
+  }
+
+  return kept;
+};
+
+export async function fetchAllDiscoveryJobs(
+  input: DiscoveryFetchInput
+): Promise<{ jobs: NormalizedJob[]; sourceErrors: Record<string, string> }> {
+  const tasks: Promise<SourceFetchResult>[] = [
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const jobs = await fetchAdzunaJobs({
+          keywords: input.keywords,
+          locations: input.locations,
+          roleTypes: input.roleTypes,
+          maxPages: input.adzunaMaxPages ?? 2,
+        });
+        return { source: "adzuna", jobs };
+      } catch (e) {
+        return {
+          source: "adzuna",
+          jobs: [],
+          error: e instanceof Error ? e.message : "Adzuna failed",
+        };
+      }
+    })(),
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const jobs = await fetchRemotiveJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+        });
+        return { source: "remotive", jobs };
+      } catch (e) {
+        return {
+          source: "remotive",
+          jobs: [],
+          error: e instanceof Error ? e.message : "Remotive failed",
+        };
+      }
+    })(),
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const { jobs, errors } = await fetchGreenhouseJobs(input.greenhouseSlugs, GREENHOUSE_MAX_SLUGS);
+        const errMsg =
+          Object.keys(errors).length > 0 ? Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join("; ") : undefined;
+        return { source: "greenhouse", jobs, error: errMsg };
+      } catch (e) {
+        return {
+          source: "greenhouse",
+          jobs: [],
+          error: e instanceof Error ? e.message : "Greenhouse failed",
+        };
+      }
+    })(),
+  ];
+
+  if (process.env.THEMUSE_API_KEY?.trim()) {
+    tasks.push(
+      (async (): Promise<SourceFetchResult> => {
+        try {
+          const jobs = await fetchTheMuseJobs({ keywords: input.keywords, page: 1 });
+          return { source: "themuse", jobs };
+        } catch (e) {
+          return {
+            source: "themuse",
+            jobs: [],
+            error: e instanceof Error ? e.message : "The Muse failed",
+          };
+        }
+      })()
+    );
+  }
+
+  const settled = await Promise.allSettled(tasks);
+
+  const sourceErrors: Record<string, string> = {};
+  const combined: NormalizedJob[] = [];
+
+  for (const s of settled) {
+    if (s.status === "fulfilled") {
+      const r = s.value;
+      if (r.error) sourceErrors[r.source] = r.error;
+      combined.push(...r.jobs);
+    } else {
+      sourceErrors.unknown = s.reason instanceof Error ? s.reason.message : "Unknown source error";
+    }
+  }
+
+  let filtered = combined.filter((j) => passesRemoteFilter(j, input.remotePreference));
+  filtered = filtered.filter((j) => passesExcluded(j, input.excludedCompanies));
+  filtered = dedupeNormalizedJobsFuzzy(filtered);
+
+  return { jobs: filtered, sourceErrors };
+}
