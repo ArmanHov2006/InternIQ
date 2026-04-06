@@ -1,97 +1,50 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
+import { useReducedMotion } from "framer-motion";
 import { BentoCard } from "@/components/ui/bento-card";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { InteractiveDemo } from "@/components/landing/interactive-demo";
 import { SectionReveal } from "@/components/ui/section-reveal";
 import { GradientText } from "@/components/ui/gradient-text";
 import { cn } from "@/lib/utils";
-import { Bot, Mail, UserRound, BarChart3, Sparkles, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight, Bot, Mail, Sparkles, Zap } from "lucide-react";
 
 const PIPELINE_FROM_FEATURES = "/dashboard/pipeline?from=features";
+const DISCOVER_ROUTE = "/dashboard/discover";
+const DISCOVERY_SOURCES = ["Adzuna", "Remotive", "Greenhouse", "The Muse"];
 
 const featureCardLinkClass =
-  "block h-full min-h-0 rounded-2xl outline-none transition-shadow duration-150 ease-out hover:shadow-lg focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
+  "group block h-full min-h-0 rounded-2xl outline-none transition-shadow duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
 
 const trackerHeaderLinkClass =
-  "flex items-start justify-between gap-4 rounded-lg p-1 -m-1 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
+  "group flex items-start justify-between gap-4 rounded-lg p-1 -m-1 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
 
-const resumeHighlights = [
-  { label: "Match score", value: "91%", accent: "text-primary" },
-  { label: "Missing keywords", value: "3 fixes", accent: "text-accent" },
-  { label: "Impact bullets", value: "6 upgraded", accent: "text-accent-cyan" },
-];
+interface VideoDemoProps {
+  webm: string;
+  mp4: string;
+  poster: string;
+  className?: string;
+}
 
-const profileStats = [
-  { label: "Profile views", value: "84" },
-  { label: "Recruiter saves", value: "12" },
-];
+const VideoDemo = ({ webm, mp4, poster, className }: VideoDemoProps) => {
+  const prefersReducedMotion = useReducedMotion();
 
-const AITypingEffect = () => {
-  const reduce = useReducedMotion();
-  if (reduce) {
-    return (
-      <div className="mt-4 space-y-2">
-        <div className="h-2 w-full rounded-full bg-primary/25" />
-        <div className="h-2 w-[80%] rounded-full bg-primary/20" />
-        <div className="h-2 w-[60%] rounded-full bg-muted-foreground/25" />
-      </div>
-    );
-  }
   return (
-    <div className="mt-4 space-y-2">
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: "100%" }}
-        transition={{ duration: 1.5, delay: 0.5 }}
-        className="h-2 rounded-full bg-primary/25"
-      />
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: "80%" }}
-        transition={{ duration: 1.2, delay: 0.8 }}
-        className="h-2 rounded-full bg-primary/20"
-      />
-      <motion.div
-        initial={{ width: 0 }}
-        animate={{ width: "60%" }}
-        transition={{ duration: 1, delay: 1.1 }}
-        className="h-2 rounded-full bg-muted-foreground/25"
-      />
-    </div>
-  );
-};
-
-const chartHeights = [40, 65, 45, 80, 55, 90, 70];
-
-const MiniChart = () => {
-  const reduce = useReducedMotion();
-  return (
-    <div className="mt-4 flex h-16 items-end gap-1.5">
-      {chartHeights.map((height, i) =>
-        reduce ? (
-          <div
-            key={i}
-            className={cn(
-              "flex-1 rounded-t-sm",
-              i % 2 === 0 ? "bg-primary/60" : "bg-accent-cyan/60"
-            )}
-            style={{ height: `${height}%` }}
-          />
-        ) : (
-          <motion.div
-            key={i}
-            initial={{ height: 0 }}
-            animate={{ height: `${height}%` }}
-            transition={{ duration: 0.5, delay: 0.1 * i }}
-            className={cn(
-              "flex-1 rounded-t-sm",
-              i % 2 === 0 ? "bg-primary/70" : "bg-accent-cyan/70"
-            )}
-          />
-        )
+    <div className={cn("relative overflow-hidden rounded-lg border border-border bg-muted/30", className)}>
+      {prefersReducedMotion ? (
+        <Image
+          src={poster}
+          alt=""
+          fill
+          sizes="(min-width: 1280px) 50vw, (min-width: 768px) 50vw, 100vw"
+          className="object-cover"
+        />
+      ) : (
+        <video autoPlay muted loop playsInline poster={poster} preload="metadata" className="h-full w-full object-cover">
+          <source src={webm} type="video/webm" />
+          <source src={mp4} type="video/mp4" />
+        </video>
       )}
     </div>
   );
@@ -122,32 +75,27 @@ export const FeaturesBento = () => {
       </div>
 
       <div className="mx-auto mt-12 grid max-w-7xl gap-4 md:grid-cols-2 xl:auto-rows-[minmax(220px,auto)] xl:grid-cols-4">
-        {/* Large: Interactive Tracker — demo + header link only */}
-        <SectionReveal className="md:col-span-2 xl:row-span-2">
+        <SectionReveal delay={0.05} className="md:col-span-2 xl:row-span-2">
           <BentoCard className="flex h-full flex-col">
-            <Link
-              href={PIPELINE_FROM_FEATURES}
-              aria-label="Open pipeline — kanban board"
-              className={cn(trackerHeaderLinkClass, "group")}
-            >
+            <Link href={PIPELINE_FROM_FEATURES} aria-label="Open pipeline - kanban board" className={trackerHeaderLinkClass}>
               <div className="min-w-0 flex-1 text-left">
                 <h3 className="text-xl font-semibold md:text-2xl">Interactive Tracker</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Drag cards across columns to feel the workflow.
+                  Drag real application cards across five pipeline stages to feel how InternIQ keeps momentum visible.
                 </p>
               </div>
               <span className="shrink-0 rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </span>
             </Link>
-            <p className="mt-2 text-xs text-muted-foreground">
-              Open the full pipeline to manage applications and drag cards between stages.
+            <p className="mt-2 text-sm text-muted-foreground">
+              Built from the same status model as the product pipeline, with fit scores and AI completion hints on key roles.
             </p>
             <div className="mt-4 flex-1 overflow-hidden rounded-lg border border-border bg-muted/30 p-3 md:mt-5 md:p-4">
               <div className="mb-3 flex items-center gap-2">
                 <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-                <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/70" />
+                <span className="h-2.5 w-2.5 rounded-full bg-primary/50" />
+                <span className="h-2.5 w-2.5 rounded-full bg-status-offer/70" />
                 <p className="ml-2 font-mono text-xs text-muted-foreground">interniq.app/pipeline</p>
               </div>
               <div className="[transform:perspective(1000px)_rotateX(3deg)]">
@@ -157,204 +105,194 @@ export const FeaturesBento = () => {
           </BentoCard>
         </SectionReveal>
 
-        {/* Wide: AI Resume Analysis */}
-        <SectionReveal className="md:col-span-2">
-          <Link
-            href={PIPELINE_FROM_FEATURES}
-            aria-label="Open pipeline — resume and AI tools"
-            className={featureCardLinkClass}
-          >
-            <BentoCard className="flex h-full flex-col justify-between">
-              <div className="flex items-start gap-4">
-                <div className="rounded-xl border border-border bg-primary/10 p-3">
-                  <Bot className="h-5 w-5 text-primary" aria-hidden />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xl font-semibold">AI Resume Analysis</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Get instant feedback, fit scoring, and actionable improvements — from any application
-                    in the pipeline.
-                  </p>
-                  <AITypingEffect />
-                </div>
-              </div>
-              <div className="mt-5 grid gap-3 rounded-2xl border border-border bg-muted/30 p-4 sm:grid-cols-3">
-                {resumeHighlights.map((item) => (
-                  <div key={item.label} className="rounded-xl border border-border bg-card/80 p-3">
-                    <p className="text-xs uppercase tracking-wider text-muted-foreground">{item.label}</p>
-                    <p className={cn("mt-2 text-lg font-semibold font-mono tabular-nums", item.accent)}>
-                      {item.value}
+        <SectionReveal delay={0.1} className="md:col-span-2">
+          <Link href={DISCOVER_ROUTE} aria-label="Open discover - AI job discovery" className={featureCardLinkClass}>
+            <BentoCard className="flex h-full flex-col gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="rounded-lg border border-border bg-primary/10 p-2.5">
+                    <Sparkles className="h-5 w-5 text-primary" aria-hidden />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-xl font-semibold">Job Discovery</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Auto-find roles from Adzuna, Remotive, Greenhouse &amp; The Muse, then rank them against your profile with AI.
                     </p>
                   </div>
-                ))}
-              </div>
-            </BentoCard>
-          </Link>
-        </SectionReveal>
-
-        {/* Small: Counter */}
-        <SectionReveal>
-          <Link href="/dashboard" aria-label="Open dashboard — applications overview" className={featureCardLinkClass}>
-            <BentoCard className="flex h-full flex-col justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Applications tracked</p>
-                <AnimatedCounter
-                  target={50000}
-                  suffix="+"
-                  className="mt-2 font-mono text-3xl font-semibold tabular-nums text-gradient"
-                />
-                <div className="mt-3 flex items-center gap-1.5 font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                  <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
-                  +2,340 this week
                 </div>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                <div className="rounded-xl border border-border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">Saved today</p>
-                  <p className="mt-1 font-mono text-base font-semibold tabular-nums">128</p>
-                </div>
-                <div className="rounded-xl border border-border bg-muted/30 p-3">
-                  <p className="text-muted-foreground">Interviews</p>
-                  <p className="mt-1 font-mono text-base font-semibold tabular-nums">42</p>
-                </div>
-              </div>
-            </BentoCard>
-          </Link>
-        </SectionReveal>
-
-        {/* Small: Cold Email */}
-        <SectionReveal>
-          <Link
-            href={PIPELINE_FROM_FEATURES}
-            aria-label="Open pipeline — cold email from applications"
-            className={featureCardLinkClass}
-          >
-            <BentoCard className="flex h-full flex-col justify-between">
-              <div className="flex items-start justify-between gap-2">
-                <div className="rounded-xl border border-border bg-primary/10 p-2.5">
-                  <Mail className="h-4 w-4 text-primary" aria-hidden />
-                </div>
-                <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">
-                  Popular
+                <span className="rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
+                  <ArrowUpRight className="h-4 w-4" aria-hidden />
                 </span>
               </div>
-              <div className="mt-3">
-                <h3 className="text-lg font-semibold">Cold Email Generator</h3>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Personalized outreach in seconds — generate from any application in the pipeline.
-                </p>
-              </div>
-              <div className="mt-4 rounded-xl border border-border bg-muted/30 p-3">
-                <div className="flex items-center justify-between text-[11px] uppercase tracking-wider text-muted-foreground">
-                  <span>Subject</span>
-                  <span className="text-primary">Tailored</span>
-                </div>
-                <p className="mt-2 text-sm text-foreground">Quick note about your product internship opening...</p>
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Personal hook, company context, and CTA already drafted.
-                </p>
-              </div>
-            </BentoCard>
-          </Link>
-        </SectionReveal>
 
-        {/* Wide: Public Profile */}
-        <SectionReveal className="md:col-span-2">
-          <Link
-            href="/dashboard/settings?section=profile"
-            aria-label="Open settings — profile and public profile"
-            className={featureCardLinkClass}
-          >
-            <BentoCard className="flex h-full flex-col justify-between">
-              <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-                <div>
-                  <div className="w-fit rounded-xl border border-border bg-accent/10 p-2.5">
-                    <UserRound className="h-4 w-4 text-accent" aria-hidden />
-                  </div>
-                  <h3 className="mt-3 text-lg font-semibold">Public Profile</h3>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Shareable portfolio with projects, skills, and achievements.
-                  </p>
-                </div>
-                <div className="grid min-w-0 grid-cols-2 gap-2 md:min-w-[220px]">
-                  {profileStats.map((item) => (
-                    <div
-                      key={item.label}
-                      className="rounded-xl border border-border bg-muted/30 p-3 text-center"
-                    >
-                      <p className="font-mono text-lg font-semibold tabular-nums">{item.value}</p>
-                      <p className="mt-1 text-xs text-muted-foreground">{item.label}</p>
-                    </div>
-                  ))}
-                </div>
+              <div className="flex flex-wrap gap-2">
+                {DISCOVERY_SOURCES.map((source) => (
+                  <span
+                    key={source}
+                    className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-xs text-foreground/90"
+                  >
+                    {source}
+                  </span>
+                ))}
               </div>
 
-              <div className="mt-5 grid gap-4 rounded-2xl border border-border bg-muted/30 p-4 md:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-                <div className="rounded-xl border border-border bg-card/80 p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="h-11 w-11 rounded-full bg-gradient-to-br from-accent/40 to-primary/40" />
-                    <div>
-                      <div className="h-2.5 w-24 rounded bg-muted-foreground/25" />
-                      <div className="mt-1.5 h-2 w-16 rounded bg-muted-foreground/15" />
-                    </div>
+              <div className="relative">
+                <VideoDemo
+                  webm="/assets/videos/demo-discovery.webm"
+                  mp4="/assets/videos/demo-discovery.mp4"
+                  poster="/assets/videos/poster-discovery.jpg"
+                  className="aspect-[16/9] sm:aspect-[2.15/1]"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-card-foreground">Job Discovery</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Four sources in one feed, scored before you even open the drawer.</p>
                   </div>
-                  <div className="mt-4 flex flex-wrap gap-1.5">
-                    <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] text-primary">React</span>
-                    <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] text-accent">Python</span>
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] text-foreground/90">SQL</span>
-                  </div>
-                </div>
-                <div className="grid gap-2 text-sm text-muted-foreground">
-                  <div className="rounded-xl border border-border bg-card/80 px-3 py-2.5">
-                    Featured projects, quantified impact, and a recruiter-ready summary in one link.
-                  </div>
-                  <div className="rounded-xl border border-border bg-card/80 px-3 py-2.5">
-                    Showcase your stack, internships, and wins without sending a PDF first.
-                  </div>
+                  <span className="rounded-full border border-primary/20 bg-card/90 px-2.5 py-1 text-xs font-mono text-primary shadow-sm">
+                    4 sources
+                  </span>
                 </div>
               </div>
             </BentoCard>
           </Link>
         </SectionReveal>
 
-        {/* Wide: Analytics */}
-        <SectionReveal className="md:col-span-2">
-          <Link href="/dashboard/insights" aria-label="Open insights — analytics" className={featureCardLinkClass}>
-            <BentoCard className="flex h-full flex-col justify-between">
-              <div className="grid gap-6 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:items-end">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="rounded-lg border border-border bg-primary/10 p-2">
-                      <BarChart3 className="h-4 w-4 text-primary" aria-hidden />
-                    </div>
-                    <h3 className="text-lg font-semibold">Analytics</h3>
+        <SectionReveal delay={0.15}>
+          <Link href={PIPELINE_FROM_FEATURES} aria-label="Open pipeline - AI fit analysis" className={featureCardLinkClass}>
+            <BentoCard className="flex h-full flex-col gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="rounded-lg border border-border bg-primary/10 p-2.5">
+                    <Bot className="h-4 w-4 text-primary" aria-hidden />
                   </div>
-                  <p className="mt-3 text-sm text-muted-foreground">
-                    See reply trends, interview momentum, and which applications deserve a follow-up first.
-                  </p>
-                  <div className="mt-4 flex flex-wrap gap-2 text-xs">
-                    <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-foreground/90">
-                      Reply rate
-                    </span>
-                    <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-foreground/90">
-                      Stage velocity
-                    </span>
-                    <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 text-foreground/90">
-                      Best channels
-                    </span>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-border bg-muted/30 p-4">
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
-                      <p className="text-xs uppercase tracking-wider text-muted-foreground">Interview rate</p>
-                      <p className="mt-1 font-mono text-2xl font-semibold tabular-nums">18.4%</p>
-                    </div>
-                    <p className="text-right font-mono text-xs text-emerald-600 dark:text-emerald-400">
-                      +4.2% this month
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-lg font-semibold">AI Fit Analysis</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Instant scoring with strengths, gaps, and suggestions that explain why a role is worth your time.
                     </p>
                   </div>
-                  <MiniChart />
+                </div>
+                <span className="rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
+                  <ArrowUpRight className="h-4 w-4" aria-hidden />
+                </span>
+              </div>
+
+              <div className="relative">
+                <VideoDemo
+                  webm="/assets/videos/demo-fit-score.webm"
+                  mp4="/assets/videos/demo-fit-score.mp4"
+                  poster="/assets/videos/poster-fit-score.jpg"
+                  className="aspect-[4/3] min-h-[220px]"
+                />
+                <div className="pointer-events-none absolute right-3 top-3 rounded-full border border-primary/20 bg-card/90 px-2.5 py-1 text-xs font-mono text-primary shadow-sm">
+                  87%
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
+                  <p className="text-sm font-semibold text-card-foreground">AI Fit Analysis</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Know the strengths, missing signals, and next fixes before you apply.</p>
+                </div>
+              </div>
+            </BentoCard>
+          </Link>
+        </SectionReveal>
+
+        <SectionReveal delay={0.2}>
+          <Link href={PIPELINE_FROM_FEATURES} aria-label="Open pipeline - cold email generator" className={featureCardLinkClass}>
+            <BentoCard className="flex h-full flex-col gap-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex min-w-0 gap-3">
+                  <div className="rounded-lg border border-border bg-primary/10 p-2.5">
+                    <Mail className="h-4 w-4 text-primary" aria-hidden />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <h3 className="text-lg font-semibold">Cold Email Generator</h3>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Personalized outreach in seconds with tone control and job-specific context already woven in.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Popular</span>
+                  <span className="rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
+                    <ArrowUpRight className="h-4 w-4" aria-hidden />
+                  </span>
+                </div>
+              </div>
+
+              <div className="relative">
+                <VideoDemo
+                  webm="/assets/videos/demo-cold-email.webm"
+                  mp4="/assets/videos/demo-cold-email.mp4"
+                  poster="/assets/videos/poster-cold-email.jpg"
+                  className="aspect-[4/3] min-h-[220px]"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
+                  <p className="text-sm font-semibold text-card-foreground">Cold Email Generator</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Switch tone, generate the draft, and send a sharper first message.</p>
+                </div>
+              </div>
+            </BentoCard>
+          </Link>
+        </SectionReveal>
+
+        <SectionReveal delay={0.25} className="md:col-span-2 xl:col-span-4">
+          <Link href={DISCOVER_ROUTE} aria-label="Open discover - smart apply workflow" className={featureCardLinkClass}>
+            <BentoCard className="h-full">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] xl:items-center">
+                <div className="flex h-full flex-col justify-between">
+                  <div>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex min-w-0 gap-3">
+                        <div className="rounded-lg border border-border bg-primary/10 p-2.5">
+                          <Zap className="h-5 w-5 text-primary" aria-hidden />
+                        </div>
+                        <div className="min-w-0 text-left">
+                          <h3 className="text-xl font-semibold md:text-2xl">Smart Apply</h3>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            Select jobs, click once, and generate tailored resumes, cover letters, and application answers for every role in the batch.
+                          </p>
+                        </div>
+                      </div>
+                      <span className="rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
+                        <ArrowUpRight className="h-4 w-4" aria-hidden />
+                      </span>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Selected</p>
+                        <p className="mt-2 font-mono text-lg font-semibold text-foreground">4 jobs</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Generated</p>
+                        <p className="mt-2 font-mono text-lg font-semibold text-foreground">12 assets</p>
+                      </div>
+                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                        <p className="text-xs uppercase tracking-wider text-muted-foreground">Time saved</p>
+                        <p className="mt-2 font-mono text-lg font-semibold text-foreground">3.4 hrs</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    This is the compounding workflow: discover, rank, select, and ship tailored materials without breaking focus.
+                  </p>
+                </div>
+
+                <div className="relative">
+                  <VideoDemo
+                    webm="/assets/videos/demo-smart-apply.webm"
+                    mp4="/assets/videos/demo-smart-apply.mp4"
+                    poster="/assets/videos/poster-smart-apply.jpg"
+                    className="aspect-[16/9] min-h-[260px]"
+                  />
+                  <div className="pointer-events-none absolute left-3 top-3 rounded-full border border-primary/20 bg-card/90 px-2.5 py-1 text-xs font-mono text-primary shadow-sm">
+                    1 click
+                  </div>
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
+                    <p className="text-sm font-semibold text-card-foreground">Smart Apply</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Queue multiple jobs, confirm once, and let InternIQ tailor every application artifact.</p>
+                  </div>
                 </div>
               </div>
             </BentoCard>

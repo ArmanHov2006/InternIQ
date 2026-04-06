@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { blurIn, fadeInLeft, fadeInUp, scaleIn } from "@/lib/animations";
@@ -27,7 +27,13 @@ export const SectionReveal = ({
   delay = 0,
   className,
 }: SectionRevealProps) => {
+  const prefersReducedMotion = useReducedMotion();
   const selected = variants[variant];
+
+  if (prefersReducedMotion) {
+    return <div className={cn(className)}>{children}</div>;
+  }
+
   return (
     <motion.div
       initial="initial"
