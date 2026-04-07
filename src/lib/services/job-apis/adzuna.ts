@@ -12,8 +12,18 @@ const inferCountry = (locations: string[]): string => {
 };
 
 const buildWhat = (keywords: string[], roleTypes: string[]): string => {
-  const parts = [...keywords, ...roleTypes].map((s) => s.trim()).filter(Boolean);
-  return parts.length ? parts.slice(0, 5).join(" ") : "intern OR entry level OR junior";
+  const skills = keywords.map((s) => s.trim()).filter(Boolean);
+  const roles = roleTypes.map((s) => s.trim()).filter(Boolean);
+
+  // OR-join top 3 skills for broader matching instead of AND-joining all
+  const skillPart = skills.slice(0, 3).join(" OR ");
+  // Always include role types so entry-level filtering reaches the API
+  const rolePart = roles.length > 0 ? roles.slice(0, 2).join(" OR ") : "";
+
+  if (skillPart && rolePart) return `(${skillPart}) AND (${rolePart})`;
+  if (skillPart) return skillPart;
+  if (rolePart) return rolePart;
+  return "intern OR entry level OR junior";
 };
 
 export const buildWhatExclude = (roleTypes: string[]): string =>

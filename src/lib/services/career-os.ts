@@ -112,7 +112,7 @@ export const detectSenioritySignal = (
 
   return {
     band,
-    delta: -8,
+    delta: -3,
     note: "Title has no clear entry-level signal.",
   };
 };
