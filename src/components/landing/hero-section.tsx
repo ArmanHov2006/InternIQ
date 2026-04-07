@@ -2,150 +2,181 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { GradientText } from "@/components/ui/gradient-text";
 import { MagneticButton } from "@/components/ui/magnetic-button";
+import { LandingVideoFrame } from "@/components/landing/landing-video-frame";
 import { SectionReveal } from "@/components/ui/section-reveal";
 import { ArrowNudgeIcon } from "@/components/ui/icons/premium-icons";
-import { Sparkles, TrendingUp, Users, Zap } from "lucide-react";
+import { fadeInRight } from "@/lib/animations";
+import { cn } from "@/lib/utils";
+import { ArrowUpRight, CheckCircle2, Search, Sparkles, Zap } from "lucide-react";
 
-const HeroVisual = () => (
-  <div id="hero-demo" className="relative flex h-[520px] w-full items-center justify-center">
-    {/* Ambient glow */}
-    <div className="absolute left-1/2 top-1/2 h-72 w-72 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/30 blur-[100px]" />
+const HERO_WORDS = ["discovery", "fit analysis", "smart apply", "tracking"];
+const HERO_SIGNAL_CHIPS = ["4 sources", "AI-ranked", "1-click apply"];
 
-    <div className="relative flex w-full max-w-md flex-col items-center gap-5">
-      {/* Main card */}
-      <motion.div
-        animate={{ rotateY: [0, 3, -3, 0], rotateX: [0, 2, -2, 0] }}
-        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-        className="relative w-full rounded-2xl border border-white/15 bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-2xl shadow-glow-md [perspective:1200px]"
-      >
-        <div className="absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_30%_20%,oklch(0.65_0.25_265_/_15%),transparent_50%)]" />
-        <div className="relative p-5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/20">
-                <Sparkles className="h-4 w-4 text-primary" />
+const HeroFallback = () => (
+  <div className="flex h-full flex-col justify-between bg-card/70 p-4">
+    <div className="space-y-2">
+      {[
+        { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
+        { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
+        { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
+      ].map((job, index) => (
+        <div key={job.role} className="rounded-md border border-border bg-card/90 p-3 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className={cn("h-2 w-2 rounded-full", index === 0 ? "bg-primary" : "bg-muted-foreground/40")} />
+                <p className="text-sm font-medium text-foreground">{job.role}</p>
               </div>
-              <span className="font-semibold">Application Tracker</span>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {job.company} - {job.source}
+              </p>
             </div>
-            <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-400">Live</span>
-          </div>
-
-          <div className="mt-5 space-y-3">
-            {["Applied to Google", "Interview at Meta", "Offer from Stripe"].map((item, i) => (
-              <motion.div
-                key={item}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.8 + i * 0.2 }}
-                className="flex items-center gap-3 rounded-xl bg-white/5 p-3"
-              >
-                <div className={`h-2 w-2 rounded-full ${i === 0 ? 'bg-blue-400' : i === 1 ? 'bg-amber-400' : 'bg-emerald-400'}`} />
-                <span className="text-sm">{item}</span>
-                <Zap className="ml-auto h-3 w-3 text-muted-foreground" />
-              </motion.div>
-            ))}
+            <span className="font-mono text-sm text-primary">{job.score}</span>
           </div>
         </div>
-      </motion.div>
+      ))}
+    </div>
 
-      {/* Stat cards row — stacked below, not overlapping */}
-      <div className="flex w-full gap-4">
-        <motion.div
-          animate={{ y: [0, -4, 0] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="flex-1 rounded-2xl border border-accent-warm/30 bg-gradient-to-br from-accent-warm/15 to-accent-warm/5 backdrop-blur-xl p-4"
-        >
-          <div className="flex items-center gap-2 text-accent-warm">
-            <TrendingUp className="h-4 w-4" />
-            <span className="text-xs font-medium">Response Rate</span>
-          </div>
-          <p className="mt-2 text-2xl font-bold text-gradient">+89%</p>
-          <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-white/10">
-            <motion.div
-              initial={{ width: 0 }}
-              animate={{ width: "89%" }}
-              transition={{ duration: 2, delay: 0.5 }}
-              className="h-full rounded-full bg-gradient-to-r from-accent-warm to-accent"
-            />
-          </div>
-        </motion.div>
-
-        <motion.div
-          animate={{ y: [0, 4, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
-          className="flex-1 rounded-2xl border border-accent/30 bg-gradient-to-br from-accent/15 to-accent/5 backdrop-blur-xl p-4"
-        >
-          <div className="flex items-center gap-2 text-accent">
-            <Users className="h-4 w-4" />
-            <span className="text-xs font-medium">Active Users</span>
-          </div>
-          <p className="mt-2 text-xl font-bold">12,847</p>
-          <div className="mt-2 flex gap-1">
-            {[...Array(5)].map((_, i) => (
-              <motion.div
-                key={i}
-                initial={{ height: 8 }}
-                animate={{ height: [8, 16 + i * 4, 8] }}
-                transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
-                className="w-2 rounded-full bg-accent/60"
-              />
-            ))}
-          </div>
-        </motion.div>
+    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      <div className="rounded-md border border-border bg-muted/40 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs font-medium text-foreground">AI evaluation</p>
+          <span className="font-mono text-xs text-primary">92%</span>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Strengths: React shipping, product intuition, internship-ready scope. Gap: deeper metrics examples.
+        </p>
+      </div>
+      <div className="rounded-md border border-border bg-muted/40 p-3">
+        <p className="text-xs font-medium text-foreground">Batch ready</p>
+        <div className="mt-2 space-y-2">
+          {["2 selected", "Resume tailored", "Answers drafted"].map((item) => (
+            <div key={item} className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/90 px-3 py-2">
+              <p className="text-xs text-foreground">{item}</p>
+              <CheckCircle2 className="h-3.5 w-3.5 text-primary" aria-hidden />
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   </div>
 );
 
+const HeroVisual = () => {
+  const prefersReducedMotion = useReducedMotion();
+
+  const shell = (
+    <div id="hero-demo" className="relative mx-auto w-full max-w-2xl lg:max-w-none">
+      <div className="pointer-events-none absolute inset-x-[10%] top-10 h-40 rounded-full bg-primary/15 blur-3xl" />
+
+      <div className="relative rounded-xl border border-border bg-card/80 p-4 shadow-glow-md backdrop-blur-xl">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
+              <Search className="h-4 w-4" aria-hidden />
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider text-muted-foreground">Live product demo</p>
+              <p className="text-sm font-medium text-foreground">Discover to Smart Apply</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-border bg-card px-3 py-1 text-xs text-muted-foreground">
+              interniq.app/discover
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs text-primary">
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              Real workflow
+            </span>
+          </div>
+        </div>
+
+        <div className="mt-4">
+          <LandingVideoFrame
+            webm="/assets/videos/demo-hero-discovery.webm"
+            mp4="/assets/videos/demo-hero-discovery.mp4"
+            poster="/assets/videos/poster-hero-discovery.jpg"
+            className="aspect-[16/10]"
+            fallback={<HeroFallback />}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap gap-2">
+          {HERO_SIGNAL_CHIPS.map((chip) => (
+            <span
+              key={chip}
+              className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs text-foreground/90"
+            >
+              {chip}
+            </span>
+          ))}
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-card px-3 py-1.5 text-xs font-mono text-primary shadow-sm">
+            <Zap className="h-3.5 w-3.5" aria-hidden />
+            ranked live
+          </span>
+        </div>
+
+        <div className="pointer-events-none absolute -bottom-4 right-4 hidden rounded-lg border border-border bg-card/90 px-3 py-2 shadow-sm md:block">
+          <div className="flex items-center gap-2">
+            <ArrowUpRight className="h-3.5 w-3.5 text-primary" aria-hidden />
+            <div>
+              <p className="text-xs text-muted-foreground">Workflow</p>
+              <p className="font-mono text-xs text-foreground">discover -&gt; apply</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (prefersReducedMotion) {
+    return shell;
+  }
+
+  return (
+    <motion.div initial="initial" animate="animate" variants={fadeInRight} transition={{ delay: 0.2 }}>
+      <motion.div
+        animate={{ y: [0, -6, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {shell}
+      </motion.div>
+    </motion.div>
+  );
+};
+
 export const HeroSection = () => {
-  const words = ["tracking", "portfolios", "cold outreach", "AI analysis"];
+  const prefersReducedMotion = useReducedMotion();
   const [wordIndex, setWordIndex] = useState(0);
 
   useEffect(() => {
+    if (prefersReducedMotion) return;
     const timer = window.setInterval(() => {
-      setWordIndex((prev) => (prev + 1) % words.length);
+      setWordIndex((prev) => (prev + 1) % HERO_WORDS.length);
     }, 2200);
     return () => window.clearInterval(timer);
-  }, [words.length]);
+  }, [prefersReducedMotion]);
 
   return (
     <section className="relative min-h-screen overflow-hidden px-4 pb-16 pt-28 sm:pb-24 sm:pt-32">
-      {/* Dot grid overlay */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:24px_24px]" />
-      
-      {/* Ambient blobs */}
+
       <div className="pointer-events-none absolute inset-0">
-        <motion.div 
-          animate={{ y: [0, -20, 0], x: [0, 10, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-[5%] top-[15%] h-[320px] w-[320px] sm:h-[480px] sm:w-[480px] rounded-full bg-primary/15 blur-[100px] sm:blur-[140px]" 
-        />
-        <motion.div 
-          animate={{ y: [0, 15, 0], x: [0, -15, 0] }}
-          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-          className="absolute bottom-[5%] right-[5%] h-[280px] w-[280px] sm:h-[400px] sm:w-[400px] rounded-full bg-accent/12 blur-[90px] sm:blur-[120px]" 
-        />
-        <motion.div 
-          animate={{ scale: [1, 1.1, 1] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-[45%] top-[40%] h-[200px] w-[200px] sm:h-[300px] sm:w-[300px] -translate-x-1/2 rounded-full bg-accent-warm/10 blur-[80px] sm:blur-[100px]" 
-        />
+        <div className="absolute left-[5%] top-[15%] h-[320px] w-[320px] rounded-full bg-primary/15 blur-[100px] sm:h-[460px] sm:w-[460px] sm:blur-[140px]" />
+        <div className="absolute bottom-[5%] right-[5%] h-[260px] w-[260px] rounded-full bg-accent/10 blur-[90px] sm:h-[360px] sm:w-[360px] sm:blur-[120px]" />
       </div>
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[55%_45%] lg:gap-8">
-        {/* Left: Content */}
+      <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[52%_48%] lg:gap-10">
         <div className="space-y-8">
           <SectionReveal>
-            <motion.span 
-              whileHover={{ scale: 1.02 }}
-              className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium"
-            >
+            <span className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
               Built for ambitious careers
-            </motion.span>
+            </span>
           </SectionReveal>
 
           <div className="space-y-5">
@@ -156,30 +187,34 @@ export const HeroSection = () => {
                 <GradientText className="inline-block">Next Role</GradientText>
               </h1>
             </SectionReveal>
-            
+
             <SectionReveal delay={0.2}>
-              <p className="max-w-lg text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl">
-                AI-powered tracking, polished public profiles, and outreach that earns replies. The complete toolkit for modern job seekers.
+              <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl">
+                Discover internship roles across four sources, rank them with AI, track every application, and generate tailored materials without breaking focus.
               </p>
             </SectionReveal>
-            
+
             <SectionReveal delay={0.25}>
               <p className="text-sm text-muted-foreground" aria-live="polite">
                 Join{" "}
                 <span className="font-semibold text-foreground">50,000+ job seekers</span>{" "}
                 sharpening their{" "}
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={wordIndex}
-                    initial={{ opacity: 0, y: 8 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -8 }}
-                    transition={{ duration: 0.3 }}
-                    className="inline-block text-gradient font-medium"
-                  >
-                    {words[wordIndex]}
-                  </motion.span>
-                </AnimatePresence>
+                {prefersReducedMotion ? (
+                  <span className="inline-block font-medium text-primary">{HERO_WORDS[0]}</span>
+                ) : (
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={wordIndex}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -8 }}
+                      transition={{ duration: 0.3 }}
+                      className="inline-block font-medium text-primary"
+                    >
+                      {HERO_WORDS[wordIndex]}
+                    </motion.span>
+                  </AnimatePresence>
+                )}
               </p>
             </SectionReveal>
           </div>
@@ -199,36 +234,24 @@ export const HeroSection = () => {
               <Link href="#features">See Demo</Link>
             </MagneticButton>
           </SectionReveal>
-          
-          {/* Social proof mini-row */}
+
           <SectionReveal delay={0.4}>
-            <div className="flex items-center gap-4 pt-4">
-              <div className="flex -space-x-2">
-                {[...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-8 w-8 rounded-full border-2 border-background bg-gradient-to-br from-primary/40 to-accent/40"
-                  />
-                ))}
-              </div>
-              <div className="text-sm">
-                <span className="font-semibold text-foreground">4.9/5</span>
-                <span className="text-muted-foreground"> from 2,400+ reviews</span>
-              </div>
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-foreground">
+                4.9/5 from 2,400+ reviews
+              </span>
+              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+                Used daily by students, interns, and early-career operators
+              </span>
             </div>
           </SectionReveal>
         </div>
 
-        {/* Right: Visual */}
-        <motion.div
-          className="relative hidden lg:block"
-          initial={{ opacity: 0, x: 60, scale: 0.95 }}
-          animate={{ opacity: 1, x: 0, scale: 1 }}
-          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-        >
+        <div className="relative order-last lg:order-none">
           <HeroVisual />
-        </motion.div>
+        </div>
       </div>
     </section>
   );
 };
+
