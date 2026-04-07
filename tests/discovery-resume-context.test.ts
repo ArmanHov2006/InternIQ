@@ -31,6 +31,22 @@ describe("discovery resume context", () => {
     expect(preview.effective_skills).toEqual(preview.detected_skills);
   });
 
+  it("falls back to resume text for location when profile location is missing", () => {
+    const preview = buildResumeContextPreview({
+      profileContext: {
+        ...profileContext,
+        profileLocation: "",
+        profileContextText:
+          "Headline: Backend engineer\nBio: Builds AI platform tooling.\nSoftware Intern at Acme",
+        resumeText:
+          "Software Intern building Python FastAPI systems in Toronto, ON for AI infrastructure work.",
+      },
+      preferences: defaultDiscoveryPreferencesRow(),
+    });
+
+    expect(preview.detected_locations).toEqual(["Toronto, ON"]);
+  });
+
   it("falls back cleanly when no resume exists", () => {
     const response = buildDiscoveryPreferencesResponse({
       userId: "user-1",

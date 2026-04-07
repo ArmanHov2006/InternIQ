@@ -64,6 +64,11 @@ const CURATED_SKILLS: Array<{ label: string; pattern: RegExp }> = [
   { label: "Observability", pattern: /\bobservability\b|\bprometheus\b|\bgrafana\b/i },
 ];
 
+const LOCATION_LABEL_PATTERN =
+  /\b(?:location|based in|located in)\s*:?\s*([A-Z][A-Za-z.' -]+(?:,\s*[A-Z][A-Za-z.' -]+){0,2})/gi;
+const CITY_REGION_PATTERN =
+  /\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s*,\s*(ON|QC|BC|AB|MB|SK|NS|NB|NL|PE|Canada|USA|United States)\b/g;
+
 const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 
@@ -159,9 +164,42 @@ const buildRoleTypeSignals = (context: DiscoveryProfileContext | null): string[]
   return [];
 };
 
+const normalizeLocationCandidate = (value: string): string =>
+  value.replace(/\s+/g, " ").replace(/[\s,.;]+$/g, "").trim();
+
+const extractLocationCandidates = (text: string): string[] => {
+  if (!text.trim()) return [];
+
+  const candidates: string[] = [];
+  const locationLabelPattern = new RegExp(LOCATION_LABEL_PATTERN.source, LOCATION_LABEL_PATTERN.flags);
+  const cityRegionPattern = new RegExp(CITY_REGION_PATTERN.source, CITY_REGION_PATTERN.flags);
+
+  let match: RegExpExecArray | null;
+  while ((match = locationLabelPattern.exec(text)) !== null) {
+    const candidate = normalizeLocationCandidate(match[1] ?? "");
+    if (candidate) candidates.push(candidate);
+  }
+
+  while ((match = cityRegionPattern.exec(text)) !== null) {
+    const city = normalizeLocationCandidate(match[1] ?? "");
+    const region = normalizeLocationCandidate(match[2] ?? "");
+    if (city && region) candidates.push(`${city}, ${region}`);
+  }
+
+  if (/\bremote\b/i.test(text)) {
+    candidates.push("Remote");
+  }
+
+  return uniqueNonEmpty(candidates);
+};
+
 const buildLocationSignals = (context: DiscoveryProfileContext | null): string[] => {
   if (!context) return [];
-  return uniqueNonEmpty([context.profileLocation]);
+  return uniqueNonEmpty([
+    context.profileLocation,
+    ...extractLocationCandidates(context.profileContextText),
+    ...extractLocationCandidates(context.resumeText),
+  ]).slice(0, 3);
 };
 
 const formatList = (values: string[], fallback: string): string => {

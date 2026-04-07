@@ -267,4 +267,37 @@ describe("runDiscoveryForUser", () => {
     });
     expect(insertedOpportunities).toHaveLength(0);
   });
+
+  it("uses the saved context location override as the search location", async () => {
+    fetchAllDiscoveryJobsMock.mockResolvedValue({ jobs: [backendInternJob], sourceErrors: {} });
+    getDiscoveryProfileContextMock.mockResolvedValue({
+      resumeText: "Built Python FastAPI Redis Docker backend systems for LLM workflows.",
+      profileKeywords: ["python", "backend"],
+      profileContextText: "Backend engineer focused on Python APIs.",
+      profileLocation: "",
+    });
+
+    const customPreferences: DiscoveryPreferencesRow = {
+      ...defaultPreferences,
+      role_types: [],
+      resume_context_customized: true,
+      resume_context_overrides: {
+        skills: ["Python", "FastAPI", "Redis"],
+        locations: ["Toronto"],
+        role_types: ["intern"],
+        note: "",
+      },
+    };
+
+    const { supabase } = createSupabaseStub(customPreferences);
+
+    await runDiscoveryForUser(supabase, "user-1");
+
+    expect(fetchAllDiscoveryJobsMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        locations: ["Toronto"],
+        roleTypes: ["intern"],
+      })
+    );
+  });
 });

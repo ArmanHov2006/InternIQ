@@ -50,32 +50,31 @@ export const PreferencesBar = ({ onOpenPrefs, onOpenAdvanced }: PreferencesBarPr
 
     const inserted = newOpportunitiesCount ?? 0;
     if ((resultsCount ?? 0) > 0 && inserted === 0) {
-      const message = `Discovery started with your saved context, but ${resultsCount} jobs did not clear your saved filters.`;
+      const message = `Discovery reviewed ${resultsCount} roles, but none matched your current context closely enough to save.`;
       setRunFeedback({ tone: "warning", message, sourceErrors });
       setLiveMessage(message);
-      toast.message(message);
       return;
     }
 
     if (sourceErrors && Object.keys(sourceErrors).length > 0) {
-      const message = `Discovery finished. Added ${inserted} new job${inserted === 1 ? "" : "s"}, but some sources had issues.`;
+      const reviewed = resultsCount ?? inserted;
+      const message = `Discovery reviewed ${reviewed} roles and saved ${inserted} match${inserted === 1 ? "" : "es"}. Some sources had issues.`;
       setRunFeedback({
         tone: "warning",
         message,
         sourceErrors,
       });
       setLiveMessage(message);
-      toast.message(message);
       return;
     }
 
+    const reviewed = resultsCount ?? inserted;
     const message =
       inserted > 0
-        ? `Discovery started with your saved context and added ${inserted} new job${inserted === 1 ? "" : "s"}.`
-        : "Discovery started with your saved context.";
+        ? `Discovery reviewed ${reviewed} roles and saved ${inserted} strong match${inserted === 1 ? "" : "es"}.`
+        : "Discovery ran with your saved context.";
     setRunFeedback({ tone: "success", message });
     setLiveMessage(message);
-    toast.success(message);
   };
 
   const lastRun = preferences?.last_discovery_at
