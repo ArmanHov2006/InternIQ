@@ -40,6 +40,9 @@ const mergePrefs = (row: DiscoveryPreferencesRow | null): DiscoveryPreferencesRo
   };
 };
 
+const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
+  Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
+
 export type RunDiscoveryOptions = {
   /** When true, skip the 3-runs-per-hour user limit (cron). */
   skipRateLimit?: boolean;
@@ -146,18 +149,27 @@ export async function runDiscoveryForUser(
     });
 
     const { resumeText, profileKeywords } = await getResumeAndKeywords(supabase, userId);
+    const hasResumeContext = Boolean(resumeText.trim());
+    const discoveryKeywords = uniqueNonEmpty([
+      ...profileKeywords,
+      ...(prefs.keywords ?? []),
+      ...(prefs.role_types ?? []),
+    ]);
 
     const minScore = prefs.min_match_score ?? 50;
     let inserted = 0;
 
     for (const job of jobs) {
       const insight = computeMatchInsight({
-        jobDescription: job.description || job.title,
+        jobDescription: [job.title, job.location, job.description].filter(Boolean).join(" "),
         resumeText,
-        profileKeywords,
+        profileKeywords: discoveryKeywords,
       });
 
-      if (insight.score < minScore) continue;
+      // When a resume has not been parsed yet, keep discovery results flowing and
+      // use saved preferences for lightweight ranking instead of filtering out
+      // every fetched job at the default threshold.
+      if (hasResumeContext && insight.score < minScore) continue;
 
       const board = inferBoardFromUrl(job.job_url);
       const externalId = job.api_job_id;
