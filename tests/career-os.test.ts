@@ -8,6 +8,13 @@ import {
 } from "@/lib/services/career-os";
 import type { Application } from "@/types/database";
 
+const backendResumeInput = {
+  resumeText: "Built Python FastAPI Redis Docker backend systems for LLM workflows and observability.",
+  profileContextText:
+    "Backend engineer focused on Python APIs, FastAPI, Redis, Docker, LLM systems, and observability.",
+  profileKeywords: ["python", "fastapi", "redis", "docker", "backend", "llm", "observability"],
+};
+
 describe("career os utilities", () => {
   it("infers a board and builds stable dedupe keys", () => {
     expect(inferBoardFromUrl("https://www.linkedin.com/jobs/view/123")).toBe("LinkedIn");
@@ -46,6 +53,57 @@ describe("career os utilities", () => {
     expect(insight.score).toBeGreaterThan(60);
     expect(insight.matched_keywords).toContain("python");
     expect(insight.matched_keywords).toContain("postgresql");
+  });
+
+  it("boosts intern titles and penalizes senior titles for entry-level discovery", () => {
+    const internInsight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Software Engineering Intern",
+      roleTypes: ["intern", "junior"],
+      jobDescription:
+        "Software Engineering Intern building Python FastAPI Redis Docker backend LLM services with observability.",
+    });
+    const neutralInsight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Software Engineer",
+      roleTypes: ["intern", "junior"],
+      jobDescription: "Software Engineer building Python APIs and backend services.",
+    });
+    const seniorInsight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Senior DevOps Engineer",
+      roleTypes: ["intern", "junior"],
+      jobDescription: "Senior DevOps Engineer building Python Docker automation and cloud infrastructure.",
+    });
+    const principalInsight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Principal Engineer",
+      roleTypes: ["intern", "junior"],
+      jobDescription: "Principal Engineer owning architecture for cloud systems in Python.",
+    });
+
+    expect(internInsight.score).toBeGreaterThanOrEqual(80);
+    expect(neutralInsight.score).toBeGreaterThanOrEqual(60);
+    expect(neutralInsight.score).toBeLessThan(80);
+    expect(seniorInsight.score).toBeLessThan(50);
+    expect(principalInsight.score).toBeLessThan(35);
+    expect(internInsight.summary).toContain("entry-level search");
+    expect(seniorInsight.summary).toContain("senior-level role");
+  });
+
+  it("keeps the old scoring behavior when no role types are provided", () => {
+    const withTitle = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Senior Software Engineer",
+      jobDescription: "Build Python FastAPI Redis systems.",
+    });
+    const withoutTitle = computeMatchInsight({
+      ...backendResumeInput,
+      jobDescription: "Build Python FastAPI Redis systems.",
+    });
+
+    expect(withTitle.score).toBe(withoutTitle.score);
+    expect(withTitle.summary).toBe(withoutTitle.summary);
   });
 
   it("builds a parseable proof pack artifact payload", () => {

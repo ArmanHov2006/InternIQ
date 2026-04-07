@@ -2,6 +2,7 @@ import { fetchAdzunaJobs } from "./adzuna";
 import { fetchGreenhouseJobs } from "./greenhouse";
 import { fetchRemotiveJobs } from "./remotive";
 import { fetchTheMuseJobs } from "./themuse";
+import { isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
 
 export type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
@@ -52,7 +53,11 @@ const passesExcluded = (job: NormalizedJob, excluded: string[]): boolean => {
   });
 };
 
-/** Drop jobs that fuzzy-duplicate an earlier kept job (same normalized company + high title similarity). */
+export const filterJobsByRoleTypeSeniority = (
+  jobs: NormalizedJob[],
+  roleTypes: string[]
+): NormalizedJob[] => jobs.filter((job) => !isEntryLevelSeniorityMismatch(job.title, roleTypes));
+
 export const dedupeNormalizedJobsFuzzy = (jobs: NormalizedJob[]): NormalizedJob[] => {
   const kept: NormalizedJob[] = [];
   const seenIds = new Set<string>();
@@ -160,6 +165,7 @@ export async function fetchAllDiscoveryJobs(
 
   let filtered = combined.filter((j) => passesRemoteFilter(j, input.remotePreference));
   filtered = filtered.filter((j) => passesExcluded(j, input.excludedCompanies));
+  filtered = filterJobsByRoleTypeSeniority(filtered, input.roleTypes);
   filtered = dedupeNormalizedJobsFuzzy(filtered);
 
   return { jobs: filtered, sourceErrors };

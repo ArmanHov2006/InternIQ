@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "./types";
+import { hasEntryLevelRoleTypes } from "@/lib/services/career-os";
 
 const ADZUNA_BASE = "https://api.adzuna.com/v1/api/jobs";
 
@@ -15,6 +16,11 @@ const buildWhat = (keywords: string[], roleTypes: string[]): string => {
   return parts.length ? parts.slice(0, 5).join(" ") : "intern OR entry level OR junior";
 };
 
+export const buildWhatExclude = (roleTypes: string[]): string =>
+  hasEntryLevelRoleTypes(roleTypes)
+    ? "senior sr staff principal lead director vp chief architect"
+    : "";
+
 export const fetchAdzunaJobs = async (input: {
   keywords: string[];
   locations: string[];
@@ -29,16 +35,18 @@ export const fetchAdzunaJobs = async (input: {
 
   const country = inferCountry(input.locations);
   const what = encodeURIComponent(buildWhat(input.keywords, input.roleTypes));
+  const whatExclude = buildWhatExclude(input.roleTypes);
   const locationParam =
     input.locations.length > 0
       ? `&where=${encodeURIComponent(input.locations.slice(0, 3).join(" "))}`
       : "";
+  const excludeParam = whatExclude ? `&what_exclude=${encodeURIComponent(whatExclude)}` : "";
 
   const pages = Math.min(Math.max(1, input.maxPages), 2);
   const all: NormalizedJob[] = [];
 
   for (let page = 1; page <= pages; page += 1) {
-    const url = `${ADZUNA_BASE}/${country}/search/${page}?app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}&results_per_page=25&what=${what}${locationParam}`;
+    const url = `${ADZUNA_BASE}/${country}/search/${page}?app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}&results_per_page=25&what=${what}${locationParam}${excludeParam}`;
     const res = await fetch(url, { next: { revalidate: 0 } });
     if (!res.ok) {
       throw new Error(`Adzuna HTTP ${res.status}`);
@@ -70,7 +78,7 @@ export const fetchAdzunaJobs = async (input: {
       const desc = (r.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
       let salary = "";
       if (r.salary_min != null && r.salary_max != null) {
-        salary = `${r.salary_min}–${r.salary_max}`;
+        salary = `${r.salary_min}-${r.salary_max}`;
       }
       const remote = /\bremote\b/i.test(`${r.title} ${desc} ${loc}`);
       all.push({

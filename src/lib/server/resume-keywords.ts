@@ -44,6 +44,7 @@ export type DiscoveryProfileContext = {
   resumeText: string;
   profileKeywords: string[];
   profileContextText: string;
+  profileLocation: string;
 };
 
 const toExperienceSnippet = (row: ExperienceRow): string =>
@@ -108,12 +109,13 @@ export const getDiscoveryProfileContext = async (
       : [];
   const projectRows =
     !projectRes.error && Array.isArray(projectRes.data) ? (projectRes.data as ProjectRow[]) : [];
+  const profileLocation = profileRow?.location?.trim() ?? "";
 
   const profileContextText = compactText([
     resumeText,
     profileRow?.headline ? `Headline: ${profileRow.headline}` : null,
     profileRow?.bio ? `Bio: ${profileRow.bio}` : null,
-    profileRow?.location ? `Location: ${profileRow.location}` : null,
+    profileLocation ? `Location: ${profileLocation}` : null,
     ...experienceRows.slice(0, 4).map(toExperienceSnippet),
     ...projectRows.slice(0, 4).map(toProjectSnippet),
   ]);
@@ -122,6 +124,7 @@ export const getDiscoveryProfileContext = async (
     resumeText,
     profileKeywords,
     profileContextText,
+    profileLocation,
   };
 };
 

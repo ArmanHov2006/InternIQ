@@ -1,4 +1,5 @@
 import type { NormalizedJob } from "./types";
+import { isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 
 const REMOTIVE_URL = "https://remotive.com/api/remote-jobs";
 
@@ -41,6 +42,8 @@ export const fetchRemotiveJobs = async (input: {
   for (const j of jobs) {
     if (j.id == null || !j.title) continue;
     const title = j.title.trim();
+    if (isEntryLevelSeniorityMismatch(title, input.roleTypes)) continue;
+
     const desc = (j.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
     if (!internish(title, j.category ?? "", j.tags ?? "")) {
       if (keywordNeedle.length === 0) continue;

@@ -98,7 +98,6 @@ export interface Application {
   last_status_change_at: string;
   created_at: string;
   updated_at: string;
-  /** JSON from DB: cover letter, interview prep, resume tailor drafts */
   ai_metadata?: Record<string, unknown> | null;
 }
 
@@ -145,6 +144,24 @@ export interface Opportunity {
 
 export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
 
+export interface DiscoveryResumeContextOverrides {
+  skills: string[];
+  locations: string[];
+  role_types: string[];
+  note: string;
+}
+
+export interface DiscoveryResumeContextPreview {
+  has_resume: boolean;
+  detected_skills: string[];
+  detected_locations: string[];
+  detected_role_types: string[];
+  effective_skills: string[];
+  effective_locations: string[];
+  effective_role_types: string[];
+  summary: string;
+}
+
 export interface DiscoveryPreferences {
   user_id: string;
   keywords: string[];
@@ -154,6 +171,10 @@ export interface DiscoveryPreferences {
   excluded_companies: string[];
   greenhouse_slugs: string[];
   min_match_score: number;
+  resume_context_enabled: boolean;
+  resume_context_customized: boolean;
+  resume_context_overrides: DiscoveryResumeContextOverrides;
+  resume_context_preview?: DiscoveryResumeContextPreview;
   is_active: boolean;
   last_discovery_at: string | null;
   created_at: string;

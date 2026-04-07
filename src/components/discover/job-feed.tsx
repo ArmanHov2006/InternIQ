@@ -103,6 +103,15 @@ export const JobFeed = () => {
 
   return (
     <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          Results based on your saved context
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Update your context above any time. Discovery keeps this feed aligned with the preferences you saved.
+        </p>
+      </div>
+
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <Tabs
           value={filter}

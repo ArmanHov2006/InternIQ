@@ -22,7 +22,6 @@ export interface DiscoveryFetchInput {
   roleTypes: string[];
   excludedCompanies: string[];
   greenhouseSlugs: string[];
-  /** Adzuna results per page; max 2 pages per run */
   adzunaMaxPages?: number;
 }
 

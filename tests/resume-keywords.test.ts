@@ -102,5 +102,6 @@ describe("getDiscoveryProfileContext", () => {
     expect(context.profileContextText).toContain("Headline: Backend engineer");
     expect(context.profileContextText).toContain("Software Intern at Acme");
     expect(context.profileContextText).toContain("Tech stack: Python, FastAPI, Redis");
+    expect(context.profileLocation).toBe("Toronto");
   });
 });

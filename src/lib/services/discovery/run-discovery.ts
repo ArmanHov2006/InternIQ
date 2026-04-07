@@ -1,50 +1,20 @@
-import { getResumeAndKeywords } from "@/lib/server/resume-keywords";
+import { getDiscoveryProfileContext } from "@/lib/server/resume-keywords";
 import { computeMatchInsight, inferBoardFromUrl } from "@/lib/services/career-os";
+import {
+  buildDiscoverySearchContext,
+  buildResumeContextPreview,
+  mergeDiscoveryPreferencesRow,
+  type DiscoveryPreferencesRow as DiscoveryPreferencesRowType,
+} from "@/lib/services/discovery/resume-context";
 import { fetchAllDiscoveryJobs } from "@/lib/services/job-apis";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-export type DiscoveryPreferencesRow = {
-  keywords: string[] | null;
-  locations: string[] | null;
-  remote_preference: string | null;
-  role_types: string[] | null;
-  excluded_companies: string[] | null;
-  greenhouse_slugs: string[] | null;
-  min_match_score: number | null;
-  is_active: boolean | null;
-};
-
-const defaultPreferences = (): DiscoveryPreferencesRow => ({
-  keywords: [],
-  locations: [],
-  remote_preference: "any",
-  role_types: ["intern", "entry-level", "junior"],
-  excluded_companies: [],
-  greenhouse_slugs: [],
-  min_match_score: 45,
-  is_active: true,
-});
-
-const mergePrefs = (row: DiscoveryPreferencesRow | null): DiscoveryPreferencesRow => {
-  const d = defaultPreferences();
-  if (!row) return d;
-  return {
-    keywords: row.keywords ?? d.keywords,
-    locations: row.locations ?? d.locations,
-    remote_preference: row.remote_preference ?? d.remote_preference,
-    role_types: row.role_types ?? d.role_types,
-    excluded_companies: row.excluded_companies ?? d.excluded_companies,
-    greenhouse_slugs: row.greenhouse_slugs ?? d.greenhouse_slugs,
-    min_match_score: row.min_match_score ?? d.min_match_score,
-    is_active: row.is_active ?? d.is_active,
-  };
-};
+export type DiscoveryPreferencesRow = DiscoveryPreferencesRowType;
 
 const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 
 export type RunDiscoveryOptions = {
-  /** When true, skip the 3-runs-per-hour user limit (cron). */
   skipRateLimit?: boolean;
 };
 
@@ -94,7 +64,7 @@ export async function runDiscoveryForUser(
     throw new Error(prefErr.message);
   }
 
-  const prefs = mergePrefs(prefRow as DiscoveryPreferencesRow | null);
+  const prefs = mergeDiscoveryPreferencesRow(prefRow as DiscoveryPreferencesRow | null);
   if (!prefs.is_active) {
     return {
       runId: "",
@@ -105,12 +75,26 @@ export async function runDiscoveryForUser(
     };
   }
 
+  const profileContext = await getDiscoveryProfileContext(supabase, userId);
+  const resumeContextPreview = buildResumeContextPreview({
+    profileContext,
+    preferences: prefs,
+  });
+  const searchContext = buildDiscoverySearchContext({
+    preferences: prefs,
+    preview: resumeContextPreview,
+  });
+
   const querySnapshot = {
     keywords: prefs.keywords,
     locations: prefs.locations,
     remote_preference: prefs.remote_preference,
     role_types: prefs.role_types,
     greenhouse_slugs: prefs.greenhouse_slugs?.slice(0, 20),
+    resume_context_enabled: prefs.resume_context_enabled,
+    resume_context_customized: prefs.resume_context_customized,
+    detected_context: searchContext.detectedContext,
+    effective_context: searchContext.effectiveContext,
     adzuna_pages: 2,
   };
 
@@ -133,8 +117,8 @@ export async function runDiscoveryForUser(
 
   try {
     const { jobs, sourceErrors } = await fetchAllDiscoveryJobs({
-      keywords: prefs.keywords ?? [],
-      locations: prefs.locations ?? [],
+      keywords: searchContext.keywords,
+      locations: searchContext.locations,
       remotePreference:
         prefs.remote_preference === "remote_only" ||
         prefs.remote_preference === "hybrid" ||
@@ -142,37 +126,34 @@ export async function runDiscoveryForUser(
         prefs.remote_preference === "any"
           ? prefs.remote_preference
           : "any",
-      roleTypes: prefs.role_types ?? [],
+      roleTypes: searchContext.roleTypes,
       excludedCompanies: prefs.excluded_companies ?? [],
       greenhouseSlugs: prefs.greenhouse_slugs ?? [],
       adzunaMaxPages: 2,
     });
 
-    const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
-      supabase,
-      userId
-    );
-    const hasResumeContext = Boolean(resumeText.trim());
+    const hasResumeContext = Boolean(profileContext.resumeText.trim());
     const discoveryKeywords = uniqueNonEmpty([
-      ...profileKeywords,
-      ...(prefs.keywords ?? []),
-      ...(prefs.role_types ?? []),
+      ...profileContext.profileKeywords,
+      ...searchContext.keywords,
+      ...searchContext.roleTypes,
     ]);
 
-    const minScore = prefs.min_match_score ?? 50;
+    const minScore = prefs.min_match_score ?? 55;
     let inserted = 0;
 
     for (const job of jobs) {
       const insight = computeMatchInsight({
         jobDescription: [job.title, job.location, job.description].filter(Boolean).join(" "),
-        resumeText,
-        profileContextText,
+        resumeText: profileContext.resumeText,
+        profileContextText: [profileContext.profileContextText, searchContext.note]
+          .filter(Boolean)
+          .join("\n\n"),
         profileKeywords: discoveryKeywords,
+        jobTitle: job.title,
+        roleTypes: searchContext.roleTypes,
       });
 
-      // When a resume has not been parsed yet, keep discovery results flowing and
-      // use saved preferences for lightweight ranking instead of filtering out
-      // every fetched job at the default threshold.
       if (hasResumeContext && insight.score < minScore) continue;
 
       const board = inferBoardFromUrl(job.job_url);

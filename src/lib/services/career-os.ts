@@ -45,6 +45,78 @@ const tokenize = (value: string): string[] =>
 const uniqueNonEmpty = (values: string[]): string[] =>
   Array.from(new Set(values.filter(Boolean)));
 
+const clamp = (value: number, min: number, max: number): number =>
+  Math.min(max, Math.max(min, value));
+
+const ENTRY_LEVEL_ROLE_TYPE_REGEX = /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|graduate)\b/i;
+const JUNIOR_TITLE_REGEX = /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|graduate|student)\b/i;
+const SENIOR_TITLE_REGEX = /\b(senior|sr\.?|staff|lead|architect|manager|head)\b/i;
+const EXECUTIVE_TITLE_REGEX = /\b(principal|director|vice president|vp|chief)\b/i;
+
+type SeniorityBand = "junior" | "neutral" | "senior" | "executive";
+
+type SenioritySignal = {
+  band: SeniorityBand;
+  delta: number;
+  note: string;
+};
+
+export const hasEntryLevelRoleTypes = (roleTypes?: string[]): boolean =>
+  Array.isArray(roleTypes) && roleTypes.some((roleType) => ENTRY_LEVEL_ROLE_TYPE_REGEX.test(roleType));
+
+export const classifyJobTitleSeniority = (jobTitle?: string): SeniorityBand => {
+  const title = jobTitle?.trim().toLowerCase() ?? "";
+  if (!title) return "neutral";
+  if (EXECUTIVE_TITLE_REGEX.test(title)) return "executive";
+  if (SENIOR_TITLE_REGEX.test(title)) return "senior";
+  if (JUNIOR_TITLE_REGEX.test(title)) return "junior";
+  return "neutral";
+};
+
+export const isEntryLevelSeniorityMismatch = (jobTitle: string, roleTypes?: string[]): boolean => {
+  if (!hasEntryLevelRoleTypes(roleTypes)) return false;
+  const band = classifyJobTitleSeniority(jobTitle);
+  return band === "senior" || band === "executive";
+};
+
+export const detectSenioritySignal = (
+  jobTitle?: string,
+  roleTypes?: string[]
+): SenioritySignal => {
+  if (!hasEntryLevelRoleTypes(roleTypes)) {
+    return { band: "neutral", delta: 0, note: "" };
+  }
+
+  const band = classifyJobTitleSeniority(jobTitle);
+  if (band === "junior") {
+    return {
+      band,
+      delta: 8,
+      note: "Title matches your entry-level search.",
+    };
+  }
+  if (band === "executive") {
+    return {
+      band,
+      delta: -35,
+      note: "Title signals a principal or director-level role for an entry-level search.",
+    };
+  }
+  if (band === "senior") {
+    return {
+      band,
+      delta: -25,
+      note: "Title signals a senior-level role for an entry-level search.",
+    };
+  }
+
+  return {
+    band,
+    delta: -8,
+    note: "Title has no clear entry-level signal.",
+  };
+};
+
 export const inferBoardFromUrl = (jobUrl: string): string => {
   try {
     const hostname = new URL(jobUrl).hostname.replace(/^www\./, "").toLowerCase();
@@ -92,6 +164,8 @@ export const computeMatchInsight = (input: {
   resumeText?: string;
   profileContextText?: string;
   profileKeywords?: string[];
+  jobTitle?: string;
+  roleTypes?: string[];
 }): MatchInsight => {
   const jobKeywords = uniqueTopTokens(input.jobDescription, 12);
   const jobText = input.jobDescription.toLowerCase();
@@ -116,7 +190,8 @@ export const computeMatchInsight = (input: {
   const weightedSignals = uniqueNonEmpty([...jobKeywords, ...explicitProfileHits]);
   const ratio = weightedSignals.length === 0 ? 0 : matched.length / weightedSignals.length;
   const scoreBoost = Math.min(8, explicitProfileHits.length * 2);
-  const score = Math.max(28, Math.min(98, Math.round(30 + ratio * 60 + scoreBoost)));
+  const seniority = detectSenioritySignal(input.jobTitle, input.roleTypes);
+  const score = clamp(Math.round(30 + ratio * 60 + scoreBoost + seniority.delta), 15, 98);
 
   const matchedSummary = matched.length
     ? `Fast match found overlap on ${matched.slice(0, 4).join(", ")}`
@@ -124,10 +199,14 @@ export const computeMatchInsight = (input: {
   const missingSummary = missing.length
     ? `Missing ${missing.slice(0, 3).join(", ")}`
     : "Coverage looks strong";
+  const summaryParts = [matchedSummary, missingSummary];
+  if (seniority.note) {
+    summaryParts.push(seniority.note);
+  }
 
   return {
     score,
-    summary: `${matchedSummary}. ${missingSummary}.`,
+    summary: `${summaryParts.join(". ")}.`,
     matched_keywords: matched,
     missing_keywords: missing,
   };
