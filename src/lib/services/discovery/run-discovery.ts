@@ -14,6 +14,13 @@ export type DiscoveryPreferencesRow = DiscoveryPreferencesRowType;
 const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
   Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
 
+const DEFAULT_GREENHOUSE_SLUGS = [
+  "stripe", "figma", "discord", "airbnb", "coinbase",
+  "databricks", "instacart", "lyft", "pinterest", "reddit",
+  "robinhood", "twitch", "vercel", "cloudflare", "asana",
+  "dropbox", "gusto", "gitlab", "elastic",
+];
+
 export type RunDiscoveryOptions = {
   skipRateLimit?: boolean;
 };
@@ -128,7 +135,9 @@ export async function runDiscoveryForUser(
           : "any",
       roleTypes: searchContext.roleTypes,
       excludedCompanies: prefs.excluded_companies ?? [],
-      greenhouseSlugs: prefs.greenhouse_slugs ?? [],
+      greenhouseSlugs: (prefs.greenhouse_slugs ?? []).length > 0
+        ? prefs.greenhouse_slugs!
+        : DEFAULT_GREENHOUSE_SLUGS,
       adzunaMaxPages: 2,
     });
 

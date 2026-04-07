@@ -116,8 +116,8 @@ const backendInternJob: NormalizedJob = {
   description: "Build Python, FastAPI, Redis, and Docker services for backend systems.",
   salary: "",
   job_url: "https://example.com/jobs/1",
-  api_source: "remotive",
-  api_job_id: "remotive-1",
+  api_source: "jobicy",
+  api_job_id: "jobicy-1",
   is_remote: true,
   posted_at: "2026-04-06T14:30:00.000Z",
 };
@@ -164,8 +164,8 @@ describe("runDiscoveryForUser", () => {
     expect(insertedOpportunities[0]).toMatchObject({
       company: "Acme",
       role: "Backend Python Intern",
-      api_source: "remotive",
-      api_job_id: "remotive-1",
+      api_source: "jobicy",
+      api_job_id: "jobicy-1",
       discovery_run_id: "run-1",
     });
     expect(insertedOpportunities[0]?.match_score).toBeGreaterThan(30);
@@ -239,7 +239,7 @@ describe("runDiscoveryForUser", () => {
         {
           ...backendInternJob,
           title: "Software Engineer",
-          api_job_id: "remotive-3",
+          api_job_id: "jobicy-3",
           description: "Build Python APIs and backend services.",
         },
       ],
@@ -254,7 +254,7 @@ describe("runDiscoveryForUser", () => {
 
     const { supabase, insertedOpportunities } = createSupabaseStub({
       ...defaultPreferences,
-      min_match_score: 70,
+      min_match_score: 85,
     });
 
     const result = await runDiscoveryForUser(supabase, "user-1");

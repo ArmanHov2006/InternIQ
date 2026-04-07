@@ -2,6 +2,9 @@ import type { NormalizedJob } from "./types";
 
 const HIMALAYAS_BASE = "https://himalayas.app/jobs/api";
 
+const SENIOR_RE = /\b(senior|sr\.?|staff|lead|principal|director|vp|chief|head|architect|manager)\b/i;
+const ENTRY_RE = /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|graduate|student)\b/i;
+
 export const fetchHimalayasJobs = async (input: {
   keywords: string[];
   roleTypes: string[];
@@ -23,7 +26,8 @@ export const fetchHimalayasJobs = async (input: {
 
   const data = (await res.json()) as {
     jobs?: Array<{
-      id?: string;
+      guid?: string;
+      id?: number;
       title?: string;
       companyName?: string;
       locationRestrictions?: string[];
@@ -32,7 +36,7 @@ export const fetchHimalayasJobs = async (input: {
       maxSalary?: number;
       applicationLink?: string;
       pubDate?: string;
-      seniority?: string;
+      seniority?: string[] | string;
       categories?: string[];
     }>;
   };
@@ -41,19 +45,23 @@ export const fetchHimalayasJobs = async (input: {
   const out: NormalizedJob[] = [];
 
   for (const j of jobs) {
-    if (!j.id || !j.title) continue;
+    const jobId = j.guid ?? (j.id != null ? String(j.id) : "");
+    if (!jobId || !j.title) continue;
 
-    // Filter for entry-level if user specified entry-level role types
+    // Normalize seniority — API returns array or string
+    const seniorityRaw = Array.isArray(j.seniority)
+      ? j.seniority.join(" ")
+      : (j.seniority ?? "");
+    const seniorityLower = seniorityRaw.toLowerCase();
+
     if (hasEntryLevel) {
-      const seniority = (j.seniority ?? "").toLowerCase();
       const title = j.title.toLowerCase();
       const isEntry =
-        /\b(entry|junior|intern|graduate|student)\b/.test(seniority) ||
-        /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|graduate|student)\b/.test(title);
-      const isSenior = /\b(senior|sr\.?|staff|lead|principal|director|vp|chief|head|architect|manager)\b/i.test(j.title);
+        /\b(entry|junior|intern|graduate|student)\b/.test(seniorityLower) ||
+        ENTRY_RE.test(title);
+      const isSenior = SENIOR_RE.test(j.title);
       if (isSenior) continue;
-      // Allow entry-level tagged OR neutrally tagged jobs (skip only senior)
-      if (!isEntry && seniority && !/\b(mid|middle)\b/.test(seniority)) continue;
+      if (!isEntry && seniorityLower && !/\b(mid|middle)\b/.test(seniorityLower)) continue;
     }
 
     const loc = Array.isArray(j.locationRestrictions) ? j.locationRestrictions.join(", ") : "";
@@ -71,7 +79,7 @@ export const fetchHimalayasJobs = async (input: {
       salary,
       job_url: (j.applicationLink ?? "").trim(),
       api_source: "himalayas",
-      api_job_id: `himalayas-${j.id}`,
+      api_job_id: `himalayas-${jobId}`,
       is_remote: true,
       posted_at: j.pubDate ? new Date(j.pubDate).toISOString() : null,
     });

@@ -1,8 +1,9 @@
 import { fetchAdzunaJobs } from "./adzuna";
 import { fetchGreenhouseJobs } from "./greenhouse";
 import { fetchHimalayasJobs } from "./himalayas";
+import { fetchJobicyJobs } from "./jobicy";
 import { fetchJSearchJobs } from "./jsearch";
-import { fetchRemotiveJobs } from "./remotive";
+import { fetchRemoteOKJobs } from "./remoteok";
 import { fetchTheMuseJobs } from "./themuse";
 import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
@@ -154,22 +155,7 @@ export async function fetchAllDiscoveryJobs(
         };
       }
     })(),
-    (async (): Promise<SourceFetchResult> => {
-      try {
-        const jobs = await fetchRemotiveJobs({
-          keywords: input.keywords,
-          roleTypes: input.roleTypes,
-        });
-        return { source: "remotive", jobs };
-      } catch (e) {
-        return {
-          source: "remotive",
-          jobs: [],
-          error: e instanceof Error ? e.message : "Remotive failed",
-        };
-      }
-    })(),
-    (async (): Promise<SourceFetchResult> => {
+(async (): Promise<SourceFetchResult> => {
       try {
         const { jobs, errors } = await fetchGreenhouseJobs(input.greenhouseSlugs, GREENHOUSE_MAX_SLUGS);
         const errMsg =
@@ -198,6 +184,42 @@ export async function fetchAllDiscoveryJobs(
           source: "himalayas",
           jobs: [],
           error: e instanceof Error ? e.message : "Himalayas failed",
+        };
+      }
+    })()
+  );
+
+  tasks.push(
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const jobs = await fetchJobicyJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+        });
+        return { source: "jobicy", jobs };
+      } catch (e) {
+        return {
+          source: "jobicy",
+          jobs: [],
+          error: e instanceof Error ? e.message : "Jobicy failed",
+        };
+      }
+    })()
+  );
+
+  tasks.push(
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const jobs = await fetchRemoteOKJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+        });
+        return { source: "remoteok", jobs };
+      } catch (e) {
+        return {
+          source: "remoteok",
+          jobs: [],
+          error: e instanceof Error ? e.message : "RemoteOK failed",
         };
       }
     })()

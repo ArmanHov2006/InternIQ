@@ -26,8 +26,8 @@ export const DiscoverView = () => {
           Discover
         </h1>
         <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          AI-powered job discovery across Adzuna, Remotive, Greenhouse, Himalayas, JSearch, and The
-          Muse. Start from your resume, then refine.
+          AI-powered job discovery across Adzuna, Greenhouse, Himalayas, Jobicy, RemoteOK, JSearch,
+          and The Muse. Start from your resume, then refine.
         </p>
       </div>
 
