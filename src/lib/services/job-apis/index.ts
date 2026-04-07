@@ -4,7 +4,10 @@ import { fetchHimalayasJobs } from "./himalayas";
 import { fetchJobicyJobs } from "./jobicy";
 import { fetchJSearchJobs } from "./jsearch";
 import { fetchRemoteOKJobs } from "./remoteok";
+import { fetchJoobleJobs } from "./jooble";
+import { fetchSearchApiJobs } from "./searchapi";
 import { fetchTheMuseJobs } from "./themuse";
+import { fetchUsajobsJobs } from "./usajobs";
 import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
 
@@ -257,6 +260,69 @@ export async function fetchAllDiscoveryJobs(
             source: "jsearch",
             jobs: [],
             error: e instanceof Error ? e.message : "JSearch failed",
+          };
+        }
+      })()
+    );
+  }
+
+  if (process.env.JOOBLE_API_KEY?.trim()) {
+    tasks.push(
+      (async (): Promise<SourceFetchResult> => {
+        try {
+          const jobs = await fetchJoobleJobs({
+            keywords: input.keywords,
+            locations: input.locations,
+            roleTypes: input.roleTypes,
+          });
+          return { source: "jooble", jobs };
+        } catch (e) {
+          return {
+            source: "jooble",
+            jobs: [],
+            error: e instanceof Error ? e.message : "Jooble failed",
+          };
+        }
+      })()
+    );
+  }
+
+  if (process.env.USAJOBS_API_KEY?.trim()) {
+    tasks.push(
+      (async (): Promise<SourceFetchResult> => {
+        try {
+          const jobs = await fetchUsajobsJobs({
+            keywords: input.keywords,
+            locations: input.locations,
+            roleTypes: input.roleTypes,
+          });
+          return { source: "usajobs", jobs };
+        } catch (e) {
+          return {
+            source: "usajobs",
+            jobs: [],
+            error: e instanceof Error ? e.message : "USAJOBS failed",
+          };
+        }
+      })()
+    );
+  }
+
+  if (process.env.SEARCHAPI_API_KEY?.trim()) {
+    tasks.push(
+      (async (): Promise<SourceFetchResult> => {
+        try {
+          const jobs = await fetchSearchApiJobs({
+            keywords: input.keywords,
+            locations: input.locations,
+            roleTypes: input.roleTypes,
+          });
+          return { source: "searchapi", jobs };
+        } catch (e) {
+          return {
+            source: "searchapi",
+            jobs: [],
+            error: e instanceof Error ? e.message : "SearchApi failed",
           };
         }
       })()
