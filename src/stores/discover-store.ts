@@ -26,7 +26,12 @@ interface DiscoverState {
   clearSelection: () => void;
   fetchPreferences: () => Promise<void>;
   fetchOpportunities: () => Promise<void>;
-  runDiscovery: () => Promise<{ error?: string; sourceErrors?: Record<string, string> }>;
+  runDiscovery: () => Promise<{
+    error?: string;
+    sourceErrors?: Record<string, string>;
+    resultsCount?: number;
+    newOpportunitiesCount?: number;
+  }>;
   updateOpportunity: (row: Opportunity) => void;
 }
 
@@ -90,6 +95,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       const payload = (await res.json()) as {
         error?: string;
         sourceErrors?: Record<string, string>;
+        resultsCount?: number;
         newOpportunitiesCount?: number;
       };
       if (!res.ok) {
@@ -97,7 +103,11 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       }
       await get().fetchOpportunities();
       await get().fetchPreferences();
-      return { sourceErrors: payload.sourceErrors };
+      return {
+        sourceErrors: payload.sourceErrors,
+        resultsCount: payload.resultsCount,
+        newOpportunitiesCount: payload.newOpportunitiesCount,
+      };
     } catch {
       return { error: "Network error" };
     } finally {

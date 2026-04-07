@@ -23,13 +23,13 @@ export async function POST(request: Request) {
     const formData = await request.formData();
     const fileEntry = formData.get("file");
     if (!(fileEntry instanceof File)) {
-      return NextResponse.json({ error: "No file provided" }, { status: 500 });
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
     if (!fileEntry.name.toLowerCase().endsWith(".pdf")) {
-      return NextResponse.json({ error: "Resume must be a PDF file" }, { status: 500 });
+      return NextResponse.json({ error: "Resume must be a PDF file" }, { status: 400 });
     }
     if (fileEntry.size > MAX_RESUME_BYTES) {
-      return NextResponse.json({ error: "Resume must be 5MB or smaller" }, { status: 500 });
+      return NextResponse.json({ error: "Resume must be 5MB or smaller" }, { status: 400 });
     }
 
     const parsed_text = await extractTextFromPdfBytes(

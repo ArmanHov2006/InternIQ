@@ -35,7 +35,7 @@ const toResponse = (
     min_match_score:
       typeof row?.min_match_score === "number" && row.min_match_score >= 0 && row.min_match_score <= 100
         ? row.min_match_score
-        : 50,
+        : 45,
     is_active: typeof row?.is_active === "boolean" ? row.is_active : true,
     last_discovery_at: typeof row?.last_discovery_at === "string" ? row.last_discovery_at : null,
     created_at: typeof row?.created_at === "string" ? row.created_at : new Date().toISOString(),
@@ -96,7 +96,7 @@ export async function PUT(request: Request) {
     ? (remoteRaw as RemotePreference)
     : "any";
 
-  let min_match_score = 50;
+  let min_match_score = 45;
   if (typeof body.min_match_score === "number") {
     min_match_score = Math.max(0, Math.min(100, Math.round(body.min_match_score)));
   }

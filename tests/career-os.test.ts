@@ -33,6 +33,21 @@ describe("career os utilities", () => {
     expect(insight.missing_keywords).toContain("experimentation");
   });
 
+  it("uses profile context and saved keywords to improve fast-match calibration", () => {
+    const insight = computeMatchInsight({
+      jobDescription:
+        "Backend engineer building Python APIs, PostgreSQL data workflows, and production automation.",
+      resumeText: "Built FastAPI services with async Python and Redis.",
+      profileContextText:
+        "Software engineer focused on backend systems, PostgreSQL, data pipelines, and production APIs.",
+      profileKeywords: ["python", "postgresql", "backend"],
+    });
+
+    expect(insight.score).toBeGreaterThan(60);
+    expect(insight.matched_keywords).toContain("python");
+    expect(insight.matched_keywords).toContain("postgresql");
+  });
+
   it("builds a parseable proof pack artifact payload", () => {
     const application: Application = {
       id: "app-1",
@@ -122,9 +137,12 @@ describe("career os utilities", () => {
         user_id: "user-1",
         file_name: "resume.pdf",
         file_url: "",
+        source_type: "upload",
+        storage_path: "user-1/resume.pdf",
         parsed_text: "TypeScript Node backend work",
         is_primary: true,
         created_at: "2026-03-30T00:00:00.000Z",
+        updated_at: "2026-03-30T00:00:00.000Z",
       },
       contacts: [],
     });

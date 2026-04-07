@@ -161,7 +161,10 @@ export async function POST(request: Request) {
     const auth = await withAuth();
     if ("response" in auth) return auth.response;
     const { supabase, user } = auth;
-    const { resumeText, profileKeywords } = await getResumeAndKeywords(supabase, user.id);
+    const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
+      supabase,
+      user.id
+    );
     const insight =
       typeof body.match_score === "number"
         ? {
@@ -170,7 +173,7 @@ export async function POST(request: Request) {
             matched_keywords: Array.isArray(body.matched_keywords) ? body.matched_keywords.map(String) : [],
             missing_keywords: Array.isArray(body.missing_keywords) ? body.missing_keywords.map(String) : [],
           }
-        : computeMatchInsight({ jobDescription, resumeText, profileKeywords });
+        : computeMatchInsight({ jobDescription, resumeText, profileContextText, profileKeywords });
 
     const dedupeFilters = [];
     if (typeof body.job_url === "string" && body.job_url.trim()) {
@@ -395,7 +398,10 @@ export async function PUT(request: Request) {
 
     const nextDescription =
       typeof body.job_description === "string" ? body.job_description.trim() : existingRes.data.job_description;
-    const { resumeText, profileKeywords } = await getResumeAndKeywords(supabase, user.id);
+    const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
+      supabase,
+      user.id
+    );
     const insight =
       typeof body.match_score === "number"
         ? {
@@ -404,7 +410,12 @@ export async function PUT(request: Request) {
             matched_keywords: Array.isArray(body.matched_keywords) ? body.matched_keywords.map(String) : existingRes.data.matched_keywords,
             missing_keywords: Array.isArray(body.missing_keywords) ? body.missing_keywords.map(String) : existingRes.data.missing_keywords,
           }
-        : computeMatchInsight({ jobDescription: nextDescription, resumeText, profileKeywords });
+        : computeMatchInsight({
+            jobDescription: nextDescription,
+            resumeText,
+            profileContextText,
+            profileKeywords,
+          });
 
     const existingRow = existingRes.data as Opportunity;
 

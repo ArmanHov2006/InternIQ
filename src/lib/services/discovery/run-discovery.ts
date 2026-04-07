@@ -21,7 +21,7 @@ const defaultPreferences = (): DiscoveryPreferencesRow => ({
   role_types: ["intern", "entry-level", "junior"],
   excluded_companies: [],
   greenhouse_slugs: [],
-  min_match_score: 50,
+  min_match_score: 45,
   is_active: true,
 });
 
@@ -148,7 +148,10 @@ export async function runDiscoveryForUser(
       adzunaMaxPages: 2,
     });
 
-    const { resumeText, profileKeywords } = await getResumeAndKeywords(supabase, userId);
+    const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
+      supabase,
+      userId
+    );
     const hasResumeContext = Boolean(resumeText.trim());
     const discoveryKeywords = uniqueNonEmpty([
       ...profileKeywords,
@@ -163,6 +166,7 @@ export async function runDiscoveryForUser(
       const insight = computeMatchInsight({
         jobDescription: [job.title, job.location, job.description].filter(Boolean).join(" "),
         resumeText,
+        profileContextText,
         profileKeywords: discoveryKeywords,
       });
 

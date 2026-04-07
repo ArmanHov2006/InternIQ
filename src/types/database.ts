@@ -106,10 +106,13 @@ export interface Resume {
   id: string;
   user_id: string;
   file_name: string;
-  file_url: string;
+  file_url: string | null;
+  source_type: "upload" | "manual";
+  storage_path?: string | null;
   parsed_text: string;
   is_primary: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface Opportunity {

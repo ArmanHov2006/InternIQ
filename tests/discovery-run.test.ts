@@ -87,7 +87,7 @@ const defaultPreferences: DiscoveryPreferencesRow = {
   role_types: ["junior"],
   excluded_companies: [],
   greenhouse_slugs: [],
-  min_match_score: 50,
+  min_match_score: 45,
   is_active: true,
 };
 
@@ -111,7 +111,11 @@ describe("runDiscoveryForUser", () => {
 
   it("keeps fetched jobs when resume context is missing", async () => {
     fetchAllDiscoveryJobsMock.mockResolvedValue({ jobs: [pythonJob], sourceErrors: {} });
-    getResumeAndKeywordsMock.mockResolvedValue({ resumeText: "", profileKeywords: [] });
+    getResumeAndKeywordsMock.mockResolvedValue({
+      resumeText: "",
+      profileKeywords: [],
+      profileContextText: "",
+    });
 
     const { supabase, insertedOpportunities, discoveryRunUpdates, preferenceUpdates } =
       createSupabaseStub(defaultPreferences);
@@ -142,9 +146,15 @@ describe("runDiscoveryForUser", () => {
     getResumeAndKeywordsMock.mockResolvedValue({
       resumeText: "Recruiting coordinator with campus hiring experience.",
       profileKeywords: ["recruiting"],
+      profileContextText: "Recruiting coordinator with campus hiring experience.",
     });
 
-    const { supabase, insertedOpportunities } = createSupabaseStub(defaultPreferences);
+    const { supabase, insertedOpportunities } = createSupabaseStub({
+      ...defaultPreferences,
+      keywords: ["recruiting"],
+      role_types: ["coordinator"],
+      min_match_score: 70,
+    });
 
     const result = await runDiscoveryForUser(supabase, "user-1");
 

@@ -42,6 +42,9 @@ const tokenize = (value: string): string[] =>
     .map(normalizeToken)
     .filter((token) => token.length >= 3 && !STOP_WORDS.has(token));
 
+const uniqueNonEmpty = (values: string[]): string[] =>
+  Array.from(new Set(values.filter(Boolean)));
+
 export const inferBoardFromUrl = (jobUrl: string): string => {
   try {
     const hostname = new URL(jobUrl).hostname.replace(/^www\./, "").toLowerCase();
@@ -87,22 +90,36 @@ const uniqueTopTokens = (value: string, limit = 10): string[] => {
 export const computeMatchInsight = (input: {
   jobDescription: string;
   resumeText?: string;
+  profileContextText?: string;
   profileKeywords?: string[];
 }): MatchInsight => {
   const jobKeywords = uniqueTopTokens(input.jobDescription, 12);
+  const jobText = input.jobDescription.toLowerCase();
+  const normalizedProfileKeywords = uniqueNonEmpty(
+    (input.profileKeywords ?? [])
+      .map(normalizeToken)
+      .filter((token) => token.length >= 3 && !STOP_WORDS.has(token))
+  );
+  const explicitProfileHits = normalizedProfileKeywords.filter((keyword) => jobText.includes(keyword));
   const comparisonCorpus = [
+    input.profileContextText ?? "",
     input.resumeText ?? "",
-    ...(input.profileKeywords ?? []),
+    ...normalizedProfileKeywords,
   ]
     .join(" ")
     .toLowerCase();
-  const matched = jobKeywords.filter((keyword) => comparisonCorpus.includes(keyword));
+  const matched = uniqueNonEmpty([
+    ...jobKeywords.filter((keyword) => comparisonCorpus.includes(keyword)),
+    ...explicitProfileHits,
+  ]);
   const missing = jobKeywords.filter((keyword) => !comparisonCorpus.includes(keyword));
-  const ratio = jobKeywords.length === 0 ? 0 : matched.length / jobKeywords.length;
-  const score = Math.max(28, Math.min(98, Math.round(28 + ratio * 72)));
+  const weightedSignals = uniqueNonEmpty([...jobKeywords, ...explicitProfileHits]);
+  const ratio = weightedSignals.length === 0 ? 0 : matched.length / weightedSignals.length;
+  const scoreBoost = Math.min(8, explicitProfileHits.length * 2);
+  const score = Math.max(28, Math.min(98, Math.round(30 + ratio * 60 + scoreBoost)));
 
   const matchedSummary = matched.length
-    ? `Strong overlap on ${matched.slice(0, 4).join(", ")}`
+    ? `Fast match found overlap on ${matched.slice(0, 4).join(", ")}`
     : "Needs stronger keyword alignment";
   const missingSummary = missing.length
     ? `Missing ${missing.slice(0, 3).join(", ")}`

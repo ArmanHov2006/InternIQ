@@ -62,7 +62,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ scored: 0, message: "No eligible jobs." });
   }
 
-  const { resumeText, profileKeywords } = await getResumeAndKeywords(supabase, user.id);
+  const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
+    supabase,
+    user.id
+  );
 
   let scored = 0;
   const chunkSize = 5;
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
     }));
 
     const scores = await scoreJobSnippetsWithClaude({
-      resumeText,
+      resumeText: profileContextText || resumeText,
       profileSkills: profileKeywords,
       jobs: snippets,
     });

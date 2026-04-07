@@ -45,7 +45,7 @@ export const PreferencesDialog = ({ open, onOpenChange }: PreferencesDialogProps
   const [roleTypes, setRoleTypes] = useState("");
   const [excluded, setExcluded] = useState("");
   const [slugs, setSlugs] = useState("");
-  const [minScore, setMinScore] = useState(50);
+  const [minScore, setMinScore] = useState(45);
   const [active, setActive] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -177,6 +177,9 @@ export const PreferencesDialog = ({ open, onOpenChange }: PreferencesDialogProps
               onChange={(e) => setMinScore(Number(e.target.value))}
               className="py-2"
             />
+            <p className="text-xs text-muted-foreground">
+              Higher values are stricter. Start around 45-55 unless you want a very narrow shortlist.
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <input

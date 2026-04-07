@@ -77,14 +77,15 @@ async function smartApplyOne(
     }
   }
 
-  const { resumeText } = await getResumeAndKeywords(supabase, userId);
+  const { resumeText, profileContextText } = await getResumeAndKeywords(supabase, userId);
+  const tailoredContext = profileContextText || resumeText;
 
   try {
     const draft = await generateDraftAnswersMarkdown({
       company: row.company,
       role: row.role,
       jobDescription: row.job_description,
-      resumeText,
+      resumeText: tailoredContext,
     });
 
     await supabase.from("application_artifacts").insert({
@@ -104,7 +105,7 @@ async function smartApplyOne(
       headers: { cookie, "Content-Type": "application/json" },
       body: JSON.stringify({
         job_url: row.job_url,
-        resume_text: resumeText,
+        resume_text: tailoredContext,
         company: row.company,
         role: row.role,
         tone: "professional",

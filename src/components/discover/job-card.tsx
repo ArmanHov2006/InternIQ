@@ -3,12 +3,11 @@
 import { useState } from "react";
 import { ExternalLink, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
-import type { Opportunity } from "@/types/database";
+import type { Application, Opportunity } from "@/types/database";
 import { parseStoredAi } from "@/lib/services/discovery/ai-scorer";
 import { cn } from "@/lib/utils";
 import { useKanbanStore } from "@/stores/kanban-store";
 import { useDiscoverStore } from "@/stores/discover-store";
-import type { Application } from "@/types/database";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
@@ -20,9 +19,9 @@ const scoreClass = (score: number | null) => {
   return "text-destructive";
 };
 
-const hasAiScore = (o: Opportunity) => {
-  const a = o.ai_score;
-  return a != null && typeof a === "object" && Object.keys(a as object).length > 0;
+const hasAiScore = (opportunity: Opportunity) => {
+  const score = opportunity.ai_score;
+  return score != null && typeof score === "object" && Object.keys(score as object).length > 0;
 };
 
 interface JobCardProps {
@@ -32,16 +31,17 @@ interface JobCardProps {
 export const JobCard = ({ opportunity }: JobCardProps) => {
   const [saving, setSaving] = useState(false);
   const [smartBusy, setSmartBusy] = useState(false);
-  const addOrUpdateFromApplication = useKanbanStore((s) => s.addOrUpdateFromApplication);
-  const updateOpportunity = useDiscoverStore((s) => s.updateOpportunity);
-  const toggleSelect = useDiscoverStore((s) => s.toggleSelect);
-  const selectedIds = useDiscoverStore((s) => s.selectedIds);
+  const addOrUpdateFromApplication = useKanbanStore((state) => state.addOrUpdateFromApplication);
+  const updateOpportunity = useDiscoverStore((state) => state.updateOpportunity);
+  const toggleSelect = useDiscoverStore((state) => state.toggleSelect);
+  const selectedIds = useDiscoverStore((state) => state.selectedIds);
 
   const onSaveToPipeline = async () => {
     if (opportunity.application_id) {
       toast.message("Already linked to pipeline.");
       return;
     }
+
     setSaving(true);
     try {
       const createResponse = await fetch("/api/applications", {
@@ -90,8 +90,8 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
 
       updateOpportunity(updatedOpportunity as Opportunity);
       toast.success("Saved to pipeline.");
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not save.");
     } finally {
       setSaving(false);
     }
@@ -100,28 +100,28 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
   const onSmartApply = async () => {
     setSmartBusy(true);
     try {
-      const res = await fetch("/api/discovery/smart-apply", {
+      const response = await fetch("/api/discovery/smart-apply", {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ opportunityId: opportunity.id }),
       });
-      const payload = (await res.json()) as {
+      const payload = (await response.json()) as {
         error?: string;
         application?: Application;
         opportunity?: Opportunity;
       };
-      if (!res.ok) {
+      if (!response.ok) {
         throw new Error(payload.error ?? "Smart Apply failed");
       }
       if (payload.application) addOrUpdateFromApplication(payload.application);
       if (payload.opportunity) updateOpportunity(payload.opportunity);
-      toast.success("Saved. Materials generated. Opening job page…");
+      toast.success("Saved. Materials generated. Opening job page...");
       if (opportunity.job_url && opportunity.job_url !== "#") {
         window.open(opportunity.job_url, "_blank", "noopener,noreferrer");
       }
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Smart Apply failed.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Smart Apply failed.");
     } finally {
       setSmartBusy(false);
     }
@@ -133,13 +133,10 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
     }
   };
 
+  const ai = parseStoredAi(opportunity);
+
   return (
-    <GlassCard
-      className={cn(
-        "p-4",
-        hasAiScore(opportunity) && "shadow-glow-xs border-primary/20"
-      )}
-    >
+    <GlassCard className={cn("p-4", hasAiScore(opportunity) && "border-primary/20 shadow-glow-xs")}>
       <div className="flex gap-3">
         <input
           type="checkbox"
@@ -161,55 +158,66 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
                 </Badge>
               ) : null}
               <span className={cn("font-mono text-sm font-medium tabular-nums", scoreClass(opportunity.match_score))}>
-                {opportunity.match_score ?? "—"}%
+                {opportunity.match_score ?? "-"}%
               </span>
             </div>
           </div>
+
           <p className="line-clamp-2 text-xs text-muted-foreground">
-            {[opportunity.location, opportunity.salary_range].filter(Boolean).join(" · ")}
+            {[opportunity.location, opportunity.salary_range].filter(Boolean).join(" - ")}
           </p>
-          {(() => {
-            const ai = parseStoredAi(opportunity);
-            if (!ai) return null;
-            const d = ai.dimensions;
-            return (
-              <details className="rounded-md border border-border bg-muted/30 p-2 text-xs">
-                <summary className="cursor-pointer font-medium text-foreground">
-                  AI evaluation — <span className="font-mono tabular-nums">{ai.overall_score}%</span>
-                </summary>
-                <p className="mt-2 text-muted-foreground">{ai.reasoning}</p>
-                {d ? (
-                  <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-muted-foreground">
-                    <li>Skills {d.skills}%</li>
-                    <li>Role fit {d.role_fit}%</li>
-                    <li>Growth {d.growth}%</li>
-                    <li>Practical {d.practical}%</li>
-                  </ul>
-                ) : null}
-                {ai.key_strengths?.length ? (
-                  <p className="mt-2 text-muted-foreground">
-                    <span className="font-medium text-foreground">Strengths:</span> {ai.key_strengths.join("; ")}
-                  </p>
-                ) : null}
-                {ai.key_gaps?.length ? (
-                  <p className="mt-1 text-muted-foreground">
-                    <span className="font-medium text-foreground">Gaps:</span> {ai.key_gaps.join("; ")}
-                  </p>
-                ) : null}
-              </details>
-            );
-          })()}
+          <p className="text-[11px] text-muted-foreground">
+            Fast match score based on your resume, profile, and saved skills.
+            {ai ? " AI evaluation adds a second opinion below." : ""}
+          </p>
+
+          {ai ? (
+            <details className="rounded-md border border-border bg-muted/30 p-2 text-xs">
+              <summary className="cursor-pointer font-medium text-foreground">
+                AI evaluation - <span className="font-mono tabular-nums">{ai.overall_score}%</span>
+              </summary>
+              <p className="mt-2 text-muted-foreground">{ai.reasoning}</p>
+              <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-muted-foreground">
+                <li>Skills {ai.dimensions.skills}%</li>
+                <li>Role fit {ai.dimensions.role_fit}%</li>
+                <li>Growth {ai.dimensions.growth}%</li>
+                <li>Practical {ai.dimensions.practical}%</li>
+              </ul>
+              {ai.key_strengths.length ? (
+                <p className="mt-2 text-muted-foreground">
+                  <span className="font-medium text-foreground">Strengths:</span>{" "}
+                  {ai.key_strengths.join("; ")}
+                </p>
+              ) : null}
+              {ai.key_gaps.length ? (
+                <p className="mt-1 text-muted-foreground">
+                  <span className="font-medium text-foreground">Gaps:</span> {ai.key_gaps.join("; ")}
+                </p>
+              ) : null}
+            </details>
+          ) : null}
+
           <div className="flex flex-wrap gap-2">
             <Button type="button" size="sm" variant="default" disabled={saving} onClick={onSaveToPipeline}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
               Save to Pipeline
             </Button>
-            <Button type="button" size="sm" variant="outline" onClick={openJob} disabled={!opportunity.job_url || opportunity.job_url === "#"}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={openJob}
+              disabled={!opportunity.job_url || opportunity.job_url === "#"}
+            >
               <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden />
               Open Job
             </Button>
             <Button type="button" size="sm" variant="secondary" disabled={smartBusy} onClick={onSmartApply}>
-              {smartBusy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />}
+              {smartBusy ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+              ) : (
+                <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />
+              )}
               Smart Apply
             </Button>
           </div>
