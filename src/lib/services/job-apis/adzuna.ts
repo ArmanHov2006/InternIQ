@@ -28,7 +28,7 @@ const buildWhat = (keywords: string[], roleTypes: string[]): string => {
 
 export const buildWhatExclude = (roleTypes: string[]): string =>
   hasEntryLevelRoleTypes(roleTypes)
-    ? "senior sr staff principal lead director vp chief architect"
+    ? "senior sr staff principal lead director vp chief architect manager head"
     : "";
 
 export const fetchAdzunaJobs = async (input: {

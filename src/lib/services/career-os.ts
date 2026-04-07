@@ -33,8 +33,74 @@ const STOP_WORDS = new Set([
   "your",
 ]);
 
+/** Generic job-description filler words that dilute scoring if picked as top tokens. */
+const JOB_NOISE_WORDS = new Set([
+  "experience",
+  "team",
+  "work",
+  "working",
+  "company",
+  "role",
+  "position",
+  "requirements",
+  "required",
+  "ability",
+  "skills",
+  "strong",
+  "including",
+  "will",
+  "our",
+  "about",
+  "join",
+  "looking",
+  "ideal",
+  "candidate",
+  "must",
+  "have",
+  "years",
+  "opportunity",
+  "responsibilities",
+  "qualifications",
+  "apply",
+  "please",
+  "what",
+  "who",
+  "how",
+  "also",
+  "well",
+  "can",
+  "using",
+  "new",
+  "make",
+  "help",
+  "across",
+  "like",
+  "based",
+  "within",
+  "knowledge",
+  "understanding",
+  "environment",
+  "part",
+  "building",
+  "ensure",
+]);
+
 const normalizeToken = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9+#.\-]/g, "");
+
+/**
+ * Normalize a multi-word keyword (e.g. "PII Detection") by splitting into
+ * individual words so each part can match independently against job text.
+ */
+const normalizeKeywordParts = (value: string): string[] => {
+  const parts = value
+    .trim()
+    .toLowerCase()
+    .split(/[\s/\\,;]+/)
+    .map((p) => p.replace(/[^a-z0-9+#.\-]/g, ""))
+    .filter((p) => p.length >= 2 && !STOP_WORDS.has(p));
+  return parts;
+};
 
 const tokenize = (value: string): string[] =>
   value
@@ -151,6 +217,7 @@ export const buildApiDedupeKey = (apiSource: string, apiJobId: string): string =
 const uniqueTopTokens = (value: string, limit = 10): string[] => {
   const counts = new Map<string, number>();
   for (const token of tokenize(value)) {
+    if (JOB_NOISE_WORDS.has(token)) continue;
     counts.set(token, (counts.get(token) ?? 0) + 1);
   }
   return Array.from(counts.entries())
@@ -171,8 +238,8 @@ export const computeMatchInsight = (input: {
   const jobText = input.jobDescription.toLowerCase();
   const normalizedProfileKeywords = uniqueNonEmpty(
     (input.profileKeywords ?? [])
-      .map(normalizeToken)
-      .filter((token) => token.length >= 3 && !STOP_WORDS.has(token))
+      .flatMap(normalizeKeywordParts)
+      .filter((token) => token.length >= 2 && !STOP_WORDS.has(token))
   );
   const explicitProfileHits = normalizedProfileKeywords.filter((keyword) => jobText.includes(keyword));
   const comparisonCorpus = [

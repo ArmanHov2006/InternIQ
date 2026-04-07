@@ -4,7 +4,7 @@ import { fetchHimalayasJobs } from "./himalayas";
 import { fetchJSearchJobs } from "./jsearch";
 import { fetchRemotiveJobs } from "./remotive";
 import { fetchTheMuseJobs } from "./themuse";
-import { isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
+import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
 
 export type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
@@ -55,10 +55,62 @@ const passesExcluded = (job: NormalizedJob, excluded: string[]): boolean => {
   });
 };
 
+const normalizeLocationTerm = (loc: string): string =>
+  loc.toLowerCase().replace(/[,.\s]+/g, " ").trim();
+
+/**
+ * Post-fetch location filter. If the user specified locations, a job must match
+ * at least one. "Remote" in the user's list lets any remote job through.
+ * If no locations are specified, everything passes.
+ */
+const passesLocationFilter = (
+  job: NormalizedJob,
+  userLocations: string[]
+): boolean => {
+  if (userLocations.length === 0) return true;
+
+  const hasRemote = userLocations.some((l) => /^remote$/i.test(l.trim()));
+  if (hasRemote && job.is_remote) return true;
+
+  const jobLoc = normalizeLocationTerm(job.location);
+  if (!jobLoc) return userLocations.length === 0 || hasRemote;
+
+  return userLocations.some((userLoc) => {
+    if (/^remote$/i.test(userLoc.trim())) return false; // already handled above
+    const needle = normalizeLocationTerm(userLoc);
+    if (!needle) return false;
+    // Check if any word from the user location appears in the job location
+    // e.g. "Toronto" matches "Toronto, ON, Canada"
+    return needle.split(/\s+/).some((word) => word.length >= 3 && jobLoc.includes(word));
+  });
+};
+
+const EXPERIENCE_YEARS_REGEX = /\b(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp\.?)\b/i;
+
+/**
+ * Enhanced seniority filter: blocks explicit senior/exec titles AND
+ * jobs requiring 4+ years of experience when searching for entry-level.
+ */
 export const filterJobsByRoleTypeSeniority = (
   jobs: NormalizedJob[],
   roleTypes: string[]
-): NormalizedJob[] => jobs.filter((job) => !isEntryLevelSeniorityMismatch(job.title, roleTypes));
+): NormalizedJob[] => {
+  if (!hasEntryLevelRoleTypes(roleTypes)) return jobs;
+
+  return jobs.filter((job) => {
+    // Block explicit senior/executive titles
+    if (isEntryLevelSeniorityMismatch(job.title, roleTypes)) return false;
+
+    // Block jobs requiring 4+ years of experience
+    const match = EXPERIENCE_YEARS_REGEX.exec(job.description);
+    if (match) {
+      const years = parseInt(match[1]!, 10);
+      if (years >= 4) return false;
+    }
+
+    return true;
+  });
+};
 
 export const dedupeNormalizedJobsFuzzy = (jobs: NormalizedJob[]): NormalizedJob[] => {
   const kept: NormalizedJob[] = [];
@@ -205,6 +257,7 @@ export async function fetchAllDiscoveryJobs(
   }
 
   let filtered = combined.filter((j) => passesRemoteFilter(j, input.remotePreference));
+  filtered = filtered.filter((j) => passesLocationFilter(j, input.locations));
   filtered = filtered.filter((j) => passesExcluded(j, input.excludedCompanies));
   filtered = filterJobsByRoleTypeSeniority(filtered, input.roleTypes);
   filtered = dedupeNormalizedJobsFuzzy(filtered);

@@ -1,7 +1,10 @@
 import type { NormalizedJob } from "./types";
-import { isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
+import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 
 const REMOTIVE_URL = "https://remotive.com/api/remote-jobs";
+
+const SENIOR_TITLE_RE = /\b(senior|sr\.?|staff|lead|principal|director|vp|chief|head|architect|manager)\b/i;
+const EXPERIENCE_YEARS_RE = /\b(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp\.?)\b/i;
 
 const internish = (title: string, category: string, tags: string): boolean => {
   const blob = `${title} ${category} ${tags}`.toLowerCase();
@@ -9,6 +12,20 @@ const internish = (title: string, category: string, tags: string): boolean => {
     /\b(intern|internship|entry[\s-]?level|junior|graduate|new grad)\b/.test(blob) ||
     /\b(student)\b/.test(blob)
   );
+};
+
+/**
+ * When searching for entry-level roles, skip jobs that look mid/senior
+ * even if they match on keywords. Checks title AND description.
+ */
+const isTooSeniorForEntryLevel = (title: string, description: string): boolean => {
+  if (SENIOR_TITLE_RE.test(title)) return true;
+  const match = EXPERIENCE_YEARS_RE.exec(description);
+  if (match) {
+    const years = parseInt(match[1]!, 10);
+    if (years >= 4) return true;
+  }
+  return false;
 };
 
 export const fetchRemotiveJobs = async (input: {
@@ -37,19 +54,31 @@ export const fetchRemotiveJobs = async (input: {
 
   const jobs = data.jobs ?? [];
   const keywordNeedle = input.keywords.map((k) => k.toLowerCase()).filter(Boolean);
+  const isEntrySearch = hasEntryLevelRoleTypes(input.roleTypes);
   const out: NormalizedJob[] = [];
 
   for (const j of jobs) {
     if (j.id == null || !j.title) continue;
     const title = j.title.trim();
+    const desc = (j.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
+
+    // Strict seniority filtering for entry-level searches
+    if (isEntrySearch && isTooSeniorForEntryLevel(title, desc)) continue;
+
+    // Standard seniority mismatch check
     if (isEntryLevelSeniorityMismatch(title, input.roleTypes)) continue;
 
-    const desc = (j.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
-    if (!internish(title, j.category ?? "", j.tags ?? "")) {
+    // For entry-level searches, REQUIRE entry-level signals OR at least 2 keyword matches
+    // (not just 1 keyword, which was too loose)
+    const isEntry = internish(title, j.category ?? "", j.tags ?? "");
+    if (!isEntry) {
       if (keywordNeedle.length === 0) continue;
       const hay = `${title} ${desc}`.toLowerCase();
-      if (!keywordNeedle.some((k) => hay.includes(k))) continue;
+      const matchCount = keywordNeedle.filter((k) => hay.includes(k)).length;
+      // Require at least 2 keyword matches for non-entry-labeled jobs
+      if (matchCount < 2) continue;
     }
+
     out.push({
       title,
       company: (j.company_name ?? "Unknown").trim(),
