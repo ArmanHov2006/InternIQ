@@ -1,5 +1,7 @@
 import { fetchAdzunaJobs } from "./adzuna";
 import { fetchGreenhouseJobs } from "./greenhouse";
+import { fetchHimalayasJobs } from "./himalayas";
+import { fetchJSearchJobs } from "./jsearch";
 import { fetchRemotiveJobs } from "./remotive";
 import { fetchTheMuseJobs } from "./themuse";
 import { isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
@@ -131,6 +133,24 @@ export async function fetchAllDiscoveryJobs(
     })(),
   ];
 
+  tasks.push(
+    (async (): Promise<SourceFetchResult> => {
+      try {
+        const jobs = await fetchHimalayasJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+        });
+        return { source: "himalayas", jobs };
+      } catch (e) {
+        return {
+          source: "himalayas",
+          jobs: [],
+          error: e instanceof Error ? e.message : "Himalayas failed",
+        };
+      }
+    })()
+  );
+
   if (process.env.THEMUSE_API_KEY?.trim()) {
     tasks.push(
       (async (): Promise<SourceFetchResult> => {
@@ -142,6 +162,27 @@ export async function fetchAllDiscoveryJobs(
             source: "themuse",
             jobs: [],
             error: e instanceof Error ? e.message : "The Muse failed",
+          };
+        }
+      })()
+    );
+  }
+
+  if (process.env.JSEARCH_API_KEY?.trim()) {
+    tasks.push(
+      (async (): Promise<SourceFetchResult> => {
+        try {
+          const jobs = await fetchJSearchJobs({
+            keywords: input.keywords,
+            locations: input.locations,
+            roleTypes: input.roleTypes,
+          });
+          return { source: "jsearch", jobs };
+        } catch (e) {
+          return {
+            source: "jsearch",
+            jobs: [],
+            error: e instanceof Error ? e.message : "JSearch failed",
           };
         }
       })()

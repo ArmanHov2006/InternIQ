@@ -91,28 +91,28 @@ export const detectSenioritySignal = (
   if (band === "junior") {
     return {
       band,
-      delta: 8,
+      delta: 10,
       note: "Title matches your entry-level search.",
     };
   }
   if (band === "executive") {
     return {
       band,
-      delta: -35,
+      delta: -30,
       note: "Title signals a principal or director-level role for an entry-level search.",
     };
   }
   if (band === "senior") {
     return {
       band,
-      delta: -25,
+      delta: -20,
       note: "Title signals a senior-level role for an entry-level search.",
     };
   }
 
   return {
     band,
-    delta: -3,
+    delta: 0,
     note: "Title has no clear entry-level signal.",
   };
 };
@@ -189,9 +189,9 @@ export const computeMatchInsight = (input: {
   const missing = jobKeywords.filter((keyword) => !comparisonCorpus.includes(keyword));
   const weightedSignals = uniqueNonEmpty([...jobKeywords, ...explicitProfileHits]);
   const ratio = weightedSignals.length === 0 ? 0 : matched.length / weightedSignals.length;
-  const scoreBoost = Math.min(8, explicitProfileHits.length * 2);
+  const scoreBoost = Math.min(15, explicitProfileHits.length * 3);
   const seniority = detectSenioritySignal(input.jobTitle, input.roleTypes);
-  const score = clamp(Math.round(30 + ratio * 60 + scoreBoost + seniority.delta), 15, 98);
+  const score = clamp(Math.round(40 + ratio * 50 + scoreBoost + seniority.delta), 15, 98);
 
   const matchedSummary = matched.length
     ? `Fast match found overlap on ${matched.slice(0, 4).join(", ")}`

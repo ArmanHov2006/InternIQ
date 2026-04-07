@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import type { DiscoveryPreferences, Opportunity } from "@/types/database";
+import type { DiscoveryPreferences, DiscoveryResumeContextOverrides, Opportunity } from "@/types/database";
 
 export type DiscoverSort = "match" | "newest";
 export type DiscoverFilter = "all" | "new" | "saved";
@@ -12,6 +12,7 @@ interface DiscoverState {
   loading: boolean;
   running: boolean;
   scoring: boolean;
+  autoFilling: boolean;
   sort: DiscoverSort;
   filter: DiscoverFilter;
   selectedIds: Set<string>;
@@ -32,6 +33,11 @@ interface DiscoverState {
     resultsCount?: number;
     newOpportunitiesCount?: number;
   }>;
+  autoFillFromResume: () => Promise<{
+    error?: string;
+    overrides?: DiscoveryResumeContextOverrides;
+    source?: string;
+  }>;
   updateOpportunity: (row: Opportunity) => void;
 }
 
@@ -43,6 +49,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   loading: true,
   running: false,
   scoring: false,
+  autoFilling: false,
   sort: "match",
   filter: "all",
   selectedIds: new Set(),
@@ -112,6 +119,46 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       return { error: "Network error" };
     } finally {
       set({ running: false });
+    }
+  },
+
+  autoFillFromResume: async () => {
+    set({ autoFilling: true });
+    try {
+      const res = await fetch("/api/discovery/auto-fill", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      const payload = (await res.json()) as {
+        error?: string;
+        overrides?: DiscoveryResumeContextOverrides;
+        source?: string;
+      };
+      if (!res.ok) {
+        return { error: payload.error ?? "Auto-fill failed" };
+      }
+      if (payload.overrides) {
+        // Save the overrides to preferences
+        const saveRes = await fetch("/api/discovery/preferences", {
+          method: "PUT",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            resume_context_enabled: true,
+            resume_context_customized: true,
+            resume_context_overrides: payload.overrides,
+          }),
+        });
+        if (saveRes.ok) {
+          const updated = (await saveRes.json()) as DiscoveryPreferences;
+          set({ preferences: updated });
+        }
+      }
+      return { overrides: payload.overrides, source: payload.source };
+    } catch {
+      return { error: "Network error" };
+    } finally {
+      set({ autoFilling: false });
     }
   },
 

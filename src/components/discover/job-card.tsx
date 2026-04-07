@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Loader2, Sparkles } from "lucide-react";
+import { ExternalLink, Loader2, MapPin, Sparkles, Clock, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Application, Opportunity } from "@/types/database";
 import { parseStoredAi } from "@/lib/services/discovery/ai-scorer";
@@ -12,16 +12,27 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassCard } from "@/components/ui/glass-card";
 
-const scoreClass = (score: number | null) => {
-  if (score == null) return "text-muted-foreground";
-  if (score >= 80) return "text-emerald-600 dark:text-emerald-400";
-  if (score >= 60) return "text-amber-600 dark:text-amber-400";
-  return "text-destructive";
+const scoreColor = (score: number | null) => {
+  if (score == null) return { text: "text-muted-foreground", bg: "bg-muted", bar: "bg-muted-foreground/30" };
+  if (score >= 80) return { text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", bar: "bg-emerald-500" };
+  if (score >= 60) return { text: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", bar: "bg-amber-500" };
+  return { text: "text-red-500 dark:text-red-400", bg: "bg-red-500/10", bar: "bg-red-500" };
 };
 
 const hasAiScore = (opportunity: Opportunity) => {
   const score = opportunity.ai_score;
   return score != null && typeof score === "object" && Object.keys(score as object).length > 0;
+};
+
+const relativeTime = (date: string | null): string => {
+  if (!date) return "";
+  const diff = Date.now() - new Date(date).getTime();
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  if (days === 0) return "Today";
+  if (days === 1) return "1d ago";
+  if (days < 7) return `${days}d ago`;
+  if (days < 30) return `${Math.floor(days / 7)}w ago`;
+  return `${Math.floor(days / 30)}mo ago`;
 };
 
 interface JobCardProps {
@@ -134,89 +145,173 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
   };
 
   const ai = parseStoredAi(opportunity);
+  const score = opportunity.match_score;
+  const colors = scoreColor(score);
+  const matchedKw = opportunity.matched_keywords ?? [];
+  const missingKw = opportunity.missing_keywords ?? [];
+  const posted = relativeTime(opportunity.posted_at ?? null);
 
   return (
-    <GlassCard className={cn("p-4", hasAiScore(opportunity) && "border-primary/20 shadow-glow-xs")}>
+    <GlassCard
+      className={cn(
+        "group relative p-4 transition-shadow duration-150 hover:shadow-md",
+        hasAiScore(opportunity) && "border-primary/20 shadow-glow-xs"
+      )}
+    >
       <div className="flex gap-3">
         <input
           type="checkbox"
-          className="mt-1 h-4 w-4 shrink-0 rounded border border-border bg-background text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          className="mt-1 h-4 w-4 shrink-0 rounded border border-border bg-background text-primary accent-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           checked={selectedIds.has(opportunity.id)}
           onChange={() => toggleSelect(opportunity.id)}
-          aria-label="Select for batch Smart Apply"
+          aria-label={`Select ${opportunity.role} at ${opportunity.company}`}
         />
+
         <div className="min-w-0 flex-1 space-y-3">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold leading-snug text-foreground">{opportunity.role}</p>
-              <p className="text-sm text-muted-foreground">{opportunity.company}</p>
+          {/* Header: Title + Score */}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 space-y-0.5">
+              <p className="text-sm font-semibold leading-snug text-foreground">
+                {opportunity.role}
+              </p>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-1">
+                  <Building2 className="h-3 w-3" aria-hidden />
+                  {opportunity.company}
+                </span>
+                {opportunity.location ? (
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin className="h-3 w-3" aria-hidden />
+                    {opportunity.location}
+                  </span>
+                ) : null}
+                {posted ? (
+                  <span className="inline-flex items-center gap-1">
+                    <Clock className="h-3 w-3" aria-hidden />
+                    {posted}
+                  </span>
+                ) : null}
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+
+            <div className="flex shrink-0 items-center gap-2">
               {opportunity.api_source ? (
-                <Badge variant="secondary" className="text-xs capitalize">
+                <Badge variant="secondary" className="text-[10px] capitalize">
                   {opportunity.api_source}
                 </Badge>
               ) : null}
-              <span className={cn("font-mono text-sm font-medium tabular-nums", scoreClass(opportunity.match_score))}>
-                {opportunity.match_score ?? "-"}%
-              </span>
+              <div className={cn("rounded-md px-2 py-1 text-center", colors.bg)}>
+                <span className={cn("font-mono text-sm font-semibold tabular-nums", colors.text)}>
+                  {score ?? "--"}%
+                </span>
+              </div>
             </div>
           </div>
 
-          <p className="line-clamp-2 text-xs text-muted-foreground">
-            {[opportunity.location, opportunity.salary_range].filter(Boolean).join(" - ")}
-          </p>
-          <p className="text-[11px] text-muted-foreground">
-            Fast match score based on your resume, profile, and saved skills.
-            {ai ? " AI evaluation adds a second opinion below." : ""}
-          </p>
+          {/* Score Bar */}
+          <div className="space-y-1">
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn("h-full rounded-full transition-all duration-300", colors.bar)}
+                style={{ width: `${Math.min(score ?? 0, 100)}%` }}
+              />
+            </div>
+            {opportunity.salary_range ? (
+              <p className="font-mono text-xs text-muted-foreground">{opportunity.salary_range}</p>
+            ) : null}
+          </div>
 
+          {/* Keyword chips */}
+          {matchedKw.length > 0 || missingKw.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {matchedKw.slice(0, 4).map((kw) => (
+                <span
+                  key={kw}
+                  className="inline-block rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                >
+                  {kw}
+                </span>
+              ))}
+              {missingKw.slice(0, 3).map((kw) => (
+                <span
+                  key={kw}
+                  className="inline-block rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                >
+                  {kw}
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          {/* AI Evaluation */}
           {ai ? (
-            <details className="rounded-md border border-border bg-muted/30 p-2 text-xs">
+            <details className="rounded-lg border border-border bg-muted/30 p-2.5 text-xs">
               <summary className="cursor-pointer font-medium text-foreground">
-                AI evaluation - <span className="font-mono tabular-nums">{ai.overall_score}%</span>
+                AI evaluation -{" "}
+                <span className={cn("font-mono tabular-nums", scoreColor(ai.overall_score).text)}>
+                  {ai.overall_score}%
+                </span>
               </summary>
-              <p className="mt-2 text-muted-foreground">{ai.reasoning}</p>
-              <ul className="mt-2 space-y-0.5 font-mono text-[11px] text-muted-foreground">
-                <li>Skills {ai.dimensions.skills}%</li>
-                <li>Role fit {ai.dimensions.role_fit}%</li>
-                <li>Growth {ai.dimensions.growth}%</li>
-                <li>Practical {ai.dimensions.practical}%</li>
-              </ul>
-              {ai.key_strengths.length ? (
-                <p className="mt-2 text-muted-foreground">
-                  <span className="font-medium text-foreground">Strengths:</span>{" "}
-                  {ai.key_strengths.join("; ")}
-                </p>
-              ) : null}
-              {ai.key_gaps.length ? (
-                <p className="mt-1 text-muted-foreground">
-                  <span className="font-medium text-foreground">Gaps:</span> {ai.key_gaps.join("; ")}
-                </p>
-              ) : null}
+              <div className="mt-2 space-y-2">
+                <p className="leading-relaxed text-muted-foreground">{ai.reasoning}</p>
+                <div className="grid grid-cols-2 gap-1 font-mono text-[11px] text-muted-foreground">
+                  <span>Skills {ai.dimensions.skills}%</span>
+                  <span>Role fit {ai.dimensions.role_fit}%</span>
+                  <span>Growth {ai.dimensions.growth}%</span>
+                  <span>Practical {ai.dimensions.practical}%</span>
+                </div>
+                {ai.key_strengths.length ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-emerald-500">Strengths:</span>{" "}
+                    {ai.key_strengths.join("; ")}
+                  </p>
+                ) : null}
+                {ai.key_gaps.length ? (
+                  <p className="text-muted-foreground">
+                    <span className="font-medium text-amber-500">Gaps:</span>{" "}
+                    {ai.key_gaps.join("; ")}
+                  </p>
+                ) : null}
+              </div>
             </details>
           ) : null}
 
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" size="sm" variant="default" disabled={saving} onClick={onSaveToPipeline}>
-              {saving ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : null}
-              Save to Pipeline
+          {/* Actions */}
+          <div className="flex flex-wrap gap-1.5">
+            <Button
+              type="button"
+              size="sm"
+              variant={opportunity.application_id ? "secondary" : "default"}
+              className="h-7 px-2.5 text-xs"
+              disabled={saving || Boolean(opportunity.application_id)}
+              onClick={onSaveToPipeline}
+            >
+              {saving ? <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden /> : null}
+              {opportunity.application_id ? "In Pipeline" : "Save"}
             </Button>
             <Button
               type="button"
               size="sm"
               variant="outline"
+              className="h-7 px-2.5 text-xs"
               onClick={openJob}
               disabled={!opportunity.job_url || opportunity.job_url === "#"}
             >
-              <ExternalLink className="mr-1 h-3.5 w-3.5" aria-hidden />
-              Open Job
+              <ExternalLink className="mr-1 h-3 w-3" aria-hidden />
+              Open
             </Button>
-            <Button type="button" size="sm" variant="secondary" disabled={smartBusy} onClick={onSmartApply}>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="h-7 px-2.5 text-xs"
+              disabled={smartBusy}
+              onClick={onSmartApply}
+            >
               {smartBusy ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+                <Loader2 className="mr-1 h-3 w-3 animate-spin" aria-hidden />
               ) : (
-                <Sparkles className="mr-1 h-3.5 w-3.5" aria-hidden />
+                <Sparkles className="mr-1 h-3 w-3" aria-hidden />
               )}
               Smart Apply
             </Button>

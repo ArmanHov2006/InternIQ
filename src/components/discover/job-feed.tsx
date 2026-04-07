@@ -1,6 +1,8 @@
 "use client";
 
-import { Compass } from "lucide-react";
+import { useState } from "react";
+import { ArrowDownWideNarrow, Clock, Compass, Sparkles } from "lucide-react";
+import { toast } from "sonner";
 import { useDiscoverStore, selectFilteredOpportunities } from "@/stores/discover-store";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
@@ -15,8 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useState } from "react";
-import { toast } from "sonner";
 import { useKanbanStore } from "@/stores/kanban-store";
 import type { Application, Opportunity } from "@/types/database";
 
@@ -51,7 +51,7 @@ export const JobFeed = () => {
       });
       const payload = (await res.json()) as { error?: string; scored?: number };
       if (!res.ok) throw new Error(payload.error ?? "Scoring failed");
-      toast.success(`Scored ${payload.scored ?? 0} job(s).`);
+      toast.success(`AI scored ${payload.scored ?? 0} job(s).`);
       await fetchOpportunities();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Scoring failed.");
@@ -103,72 +103,95 @@ export const JobFeed = () => {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-1">
-        <p className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-          Results based on your saved context
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Update your context above any time. Discovery keeps this feed aligned with the preferences you saved.
-        </p>
-      </div>
-
-      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+      {/* Controls bar */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <Tabs
           value={filter}
           onValueChange={(v) => setFilter(v as typeof filter)}
           className="w-full sm:w-auto"
         >
-          <TabsList className="h-9">
+          <TabsList className="h-8">
             <TabsTrigger value="all" className="text-xs">
-              All
+              All{" "}
+              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                {opportunities.length}
+              </span>
             </TabsTrigger>
             <TabsTrigger value="new" className="text-xs">
-              New
+              New{" "}
+              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                {opportunities.filter((o) => o.status === "new").length}
+              </span>
             </TabsTrigger>
             <TabsTrigger value="saved" className="text-xs">
-              Saved
+              Saved{" "}
+              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
+                {opportunities.filter((o) => o.status === "saved").length}
+              </span>
             </TabsTrigger>
           </TabsList>
         </Tabs>
-        <div className="flex flex-wrap gap-2">
+
+        <div className="flex flex-wrap items-center gap-1.5">
           <Button
             type="button"
             variant={sort === "match" ? "secondary" : "ghost"}
             size="sm"
-            className="text-xs"
+            className="h-7 text-[11px]"
             onClick={() => setSort("match")}
           >
+            <ArrowDownWideNarrow className="mr-1 h-3 w-3" aria-hidden />
             Best match
           </Button>
           <Button
             type="button"
             variant={sort === "newest" ? "secondary" : "ghost"}
             size="sm"
-            className="text-xs"
+            className="h-7 text-[11px]"
             onClick={() => setSort("newest")}
           >
+            <Clock className="mr-1 h-3 w-3" aria-hidden />
             Newest
           </Button>
-          <Button type="button" variant="outline" size="sm" className="text-xs" disabled={scoring} onClick={onAiScore}>
-            AI Score top matches
+          <div className="mx-1 h-4 w-px bg-border" />
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            disabled={scoring}
+            onClick={onAiScore}
+          >
+            <Sparkles className="mr-1 h-3 w-3" aria-hidden />
+            AI Score
           </Button>
-          <Button type="button" variant="outline" size="sm" className="text-xs" onClick={onBatchClick}>
-            Batch Smart Apply ({selectedIds.size})
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-7 text-[11px]"
+            onClick={onBatchClick}
+          >
+            Batch Apply{" "}
+            {selectedIds.size > 0 ? (
+              <span className="ml-1 font-mono">({selectedIds.size})</span>
+            ) : null}
           </Button>
         </div>
       </div>
 
+      {/* Results grid */}
       {loading ? (
         <div className="grid gap-3 md:grid-cols-2">
           {[1, 2, 3, 4].map((i) => (
-            <SkeletonShimmer key={i} className="h-40 rounded-lg" />
+            <SkeletonShimmer key={i} className="h-44 rounded-lg" />
           ))}
         </div>
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<Compass className="h-6 w-6" aria-hidden />}
           title="No discovered jobs yet"
-          description="Run discovery from the bar above, or adjust your preferences to cast a wider net."
+          description="Run Discovery to scan multiple job sources, or adjust your search context to cast a wider net."
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -178,13 +201,15 @@ export const JobFeed = () => {
         </div>
       )}
 
+      {/* Batch confirmation dialog */}
       <Dialog open={batchOpen} onOpenChange={setBatchOpen}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Run Smart Apply on {selectedIds.size} jobs?</DialogTitle>
             <DialogDescription>
-              This creates applications, generates draft materials, and opens each job URL. You stay in control of
-              submitting on the employer site. Rate limited to 10 batch actions per hour.
+              This creates applications, generates draft materials, and opens each job URL. You stay
+              in control of submitting on the employer site. Rate limited to 10 batch actions per
+              hour.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2 sm:gap-0">

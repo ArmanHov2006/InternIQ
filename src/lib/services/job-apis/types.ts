@@ -1,4 +1,4 @@
-export type JobApiSource = "adzuna" | "remotive" | "greenhouse" | "themuse";
+export type JobApiSource = "adzuna" | "remotive" | "greenhouse" | "themuse" | "jsearch" | "himalayas";
 
 export interface NormalizedJob {
   title: string;
