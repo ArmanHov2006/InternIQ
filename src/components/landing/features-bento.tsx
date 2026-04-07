@@ -6,11 +6,13 @@ import { InteractiveDemo } from "@/components/landing/interactive-demo";
 import { LandingVideoFrame } from "@/components/landing/landing-video-frame";
 import { SectionReveal } from "@/components/ui/section-reveal";
 import { GradientText } from "@/components/ui/gradient-text";
+import { cn } from "@/lib/utils";
 import { ArrowUpRight, Bot, Mail, Sparkles, Zap } from "lucide-react";
 
 const PIPELINE_FROM_FEATURES = "/dashboard/pipeline?from=features";
 const DISCOVER_ROUTE = "/dashboard/discover";
 const DISCOVERY_SOURCES = ["Adzuna", "Remotive", "Greenhouse", "The Muse"];
+const TRACKER_PROOF_CHIPS = ["5 stages", "drag live", "AI signals"];
 
 const featureCardLinkClass =
   "group block h-full min-h-0 rounded-2xl outline-none transition-shadow duration-150 ease-out focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
@@ -19,110 +21,268 @@ const trackerHeaderLinkClass =
   "group flex items-start justify-between gap-4 rounded-lg p-1 -m-1 outline-none transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background";
 
 const DiscoveryFallback = () => (
-  <div className="flex h-full flex-col justify-between bg-card/70 p-4">
-    <div className="space-y-2">
-      {[
-        { role: "Frontend Intern", company: "Vercel", score: "91%" },
-        { role: "Product Analyst", company: "Stripe", score: "84%" },
-        { role: "Design Engineer", company: "Figma", score: "79%" },
-      ].map((job) => (
-        <div key={job.role} className="rounded-md border border-border bg-card/90 p-3 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-foreground">{job.role}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{job.company}</p>
+  <div className="flex h-full flex-col bg-gradient-to-br from-card/95 via-card/90 to-muted/40 p-4">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Discovery run</p>
+        <p className="mt-1 text-sm font-medium text-foreground">AI-ranked feed</p>
+      </div>
+      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs font-mono text-primary">
+        12 roles
+      </span>
+    </div>
+
+    <div className="mt-3 grid flex-1 gap-3 sm:grid-cols-[minmax(0,1.08fr)_minmax(220px,0.92fr)]">
+      <div className="space-y-2">
+        {[
+          { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
+          { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
+          { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
+        ].map((job, index) => (
+          <div
+            key={job.role}
+            className={cn(
+              "rounded-xl border border-border p-3 shadow-sm",
+              index === 0 ? "bg-primary/5" : "bg-card/90"
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={cn("h-2 w-2 rounded-full", index === 0 ? "bg-primary" : "bg-muted-foreground/40")} />
+                  <p className="truncate text-sm font-medium text-foreground">{job.role}</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {job.company} / {job.source}
+                </p>
+              </div>
+              <span className="font-mono text-sm text-primary">{job.score}</span>
             </div>
-            <span className="font-mono text-sm text-primary">{job.score}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/85 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-foreground">Expanded AI evaluation</p>
+          <span className="rounded-full border border-border bg-muted/40 px-2 py-1 text-[11px] text-muted-foreground">
+            top match
+          </span>
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div className="rounded-lg border border-border bg-muted/25 p-3">
+            <p className="text-[11px] uppercase tracking-[0.16em] text-muted-foreground">Strengths</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              React shipping speed, product intuition, and intern-ready scope.
+            </p>
+          </div>
+          <div className="space-y-2 rounded-lg border border-border bg-muted/25 p-3">
+            {[
+              { label: "Frontend fit", value: "92%" },
+              { label: "Product signal", value: "88%" },
+              { label: "Resume match", value: "84%" },
+            ].map((metric) => (
+              <div key={metric.label}>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs text-muted-foreground">{metric.label}</p>
+                  <p className="font-mono text-xs text-foreground">{metric.value}</p>
+                </div>
+                <div className="mt-1 h-1.5 rounded-full bg-muted">
+                  <div
+                    className={cn(
+                      "h-full rounded-full bg-primary",
+                      metric.value === "92%" && "w-[92%]",
+                      metric.value === "88%" && "w-[88%]",
+                      metric.value === "84%" && "w-[84%]"
+                    )}
+                  />
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      ))}
-    </div>
-    <div className="mt-3 rounded-md border border-border bg-muted/40 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-medium text-foreground">AI evaluation</p>
-        <span className="font-mono text-xs text-primary">top match</span>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
-        Strengths: React shipping, product intuition, internship-ready scope. Gap: analytics depth.
-      </p>
     </div>
   </div>
 );
 
 const FitAnalysisFallback = () => (
-  <div className="flex h-full flex-col justify-between bg-card/70 p-4">
-    <div className="flex items-start justify-between gap-2">
+  <div className="flex h-full flex-col bg-gradient-to-br from-card/95 via-card/90 to-muted/35 p-4">
+    <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="text-xs uppercase tracking-wider text-muted-foreground">Fit analysis</p>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Fit analysis</p>
         <p className="mt-1 text-sm font-medium text-foreground">Role match breakdown</p>
       </div>
-      <span className="font-mono text-lg font-semibold text-primary">87%</span>
+      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-sm text-primary">
+        87%
+      </span>
     </div>
-    <div className="space-y-2">
-      <div className="rounded-md border border-border bg-card/90 p-3">
+
+    <div className="mt-4 rounded-xl border border-border bg-card/90 p-4 shadow-sm">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-foreground">Strong match</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Enough alignment to apply now, with a few targeted edits.
+          </p>
+        </div>
+        <p className="font-mono text-3xl font-semibold text-foreground">87%</p>
+      </div>
+
+      <div className="mt-4 space-y-2">
+        {[
+          { label: "Experience overlap", width: "w-[88%]" },
+          { label: "Stack match", width: "w-[92%]" },
+          { label: "Story clarity", width: "w-[74%]" },
+        ].map((row) => (
+          <div key={row.label}>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs text-muted-foreground">{row.label}</p>
+              <p className="font-mono text-xs text-foreground">{row.width.slice(3, -2)}%</p>
+            </div>
+            <div className="mt-1 h-1.5 rounded-full bg-muted">
+              <div className={cn("h-full rounded-full bg-primary", row.width)} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="rounded-lg border border-border bg-muted/25 p-3">
         <p className="text-xs font-medium text-foreground">Strengths</p>
-        <p className="mt-1 text-xs text-muted-foreground">Frontend depth, shipping speed, product taste.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Frontend depth, shipping speed, product taste.</p>
       </div>
-      <div className="rounded-md border border-border bg-card/90 p-3">
-        <p className="text-xs font-medium text-foreground">Gaps</p>
-        <p className="mt-1 text-xs text-muted-foreground">System design examples and experimentation metrics.</p>
-      </div>
-      <div className="rounded-md border border-border bg-card/90 p-3">
+      <div className="rounded-lg border border-border bg-muted/25 p-3">
         <p className="text-xs font-medium text-foreground">Next move</p>
-        <p className="mt-1 text-xs text-muted-foreground">Tailor the resume bullets before sending the application.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Tailor the resume bullets before sending the application.</p>
       </div>
     </div>
   </div>
 );
 
 const ColdEmailFallback = () => (
-  <div className="flex h-full flex-col bg-card/70 p-4">
+  <div className="flex h-full flex-col bg-gradient-to-br from-card/95 via-card/90 to-muted/35 p-4">
     <div className="flex items-center justify-between gap-2">
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">Cold email</p>
-      <span className="rounded-full border border-border bg-card/90 px-2 py-0.5 text-xs text-primary">drafted</span>
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Cold email</p>
+        <p className="mt-1 text-sm font-medium text-foreground">Generated in the application drawer</p>
+      </div>
+      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 text-xs text-primary">
+        drafted
+      </span>
     </div>
-    <div className="mt-3 rounded-md border border-border bg-card/90 p-3">
+
+    <div className="mt-3 flex flex-wrap gap-2">
+      <span className="rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs text-foreground">
+        Vercel
+      </span>
+      <span className="rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs text-foreground">
+        Frontend Intern
+      </span>
+      <span className="rounded-full border border-border bg-card/90 px-2.5 py-1 text-xs text-muted-foreground">
+        personalized
+      </span>
+    </div>
+
+    <div className="mt-3 rounded-xl border border-border bg-card/90 p-3 shadow-sm">
       <p className="text-xs text-muted-foreground">Subject</p>
-      <p className="mt-1 text-sm font-medium text-foreground">Quick note on your summer intern opening</p>
+      <p className="mt-1 text-sm font-medium text-foreground">Quick note on the frontend intern opening</p>
     </div>
-    <div className="mt-3 flex-1 rounded-md border border-border bg-muted/40 p-3">
+
+    <div className="mt-3 flex-1 rounded-xl border border-border bg-muted/25 p-3">
       <div className="space-y-2 text-xs text-muted-foreground">
         <p>Hi Maya,</p>
-        <p>I noticed the team is hiring a frontend intern and wanted to reach out with a short intro.</p>
-        <p>I have been building React product flows and would love to contribute to the team this summer.</p>
-        <p>Happy to share work samples if helpful.</p>
+        <p>
+          I came across the frontend intern role and wanted to reach out with a quick introduction because the
+          product craft at Vercel feels especially aligned with the work I enjoy.
+        </p>
+        <p>
+          I have been building React product flows with a strong focus on speed, polish, and developer experience.
+        </p>
+        <p>Happy to share a few relevant projects if that would be useful.</p>
+      </div>
+    </div>
+
+    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+      <div className="rounded-lg border border-border bg-card/90 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">Company context</p>
+        <p className="mt-1 text-xs text-foreground">Included</p>
+      </div>
+      <div className="rounded-lg border border-border bg-card/90 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">Saved to draft</p>
+        <p className="mt-1 text-xs text-foreground">Ready to refine</p>
       </div>
     </div>
   </div>
 );
 
 const SmartApplyFallback = () => (
-  <div className="grid h-full gap-3 bg-card/70 p-4 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-    <div className="space-y-2">
-      {[
-        "Vercel Frontend Intern",
-        "Stripe Product Analyst",
-        "Figma Design Engineer",
-      ].map((role) => (
-        <div key={role} className="flex items-center gap-3 rounded-md border border-border bg-card/90 p-3 shadow-sm">
-          <span className="h-4 w-4 rounded border border-primary/30 bg-primary/10" />
-          <p className="min-w-0 text-sm text-foreground">{role}</p>
-        </div>
-      ))}
+  <div className="flex h-full flex-col bg-gradient-to-br from-card/95 via-card/90 to-muted/35 p-4">
+    <div className="flex items-center justify-between gap-2">
+      <div>
+        <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Smart Apply</p>
+        <p className="mt-1 text-sm font-medium text-foreground">Batch run across selected roles</p>
+      </div>
+      <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary">
+        3 selected
+      </span>
     </div>
-    <div className="rounded-md border border-border bg-muted/40 p-3">
-      <p className="text-xs uppercase tracking-wider text-muted-foreground">Generated assets</p>
-      <div className="mt-3 space-y-2">
+
+    <div className="mt-3 grid flex-1 gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <div className="space-y-2">
         {[
-          "Resume tailored",
-          "Cover letter drafted",
-          "Form answers saved",
-        ].map((item) => (
-          <div key={item} className="flex items-center justify-between gap-3 rounded-md border border-border bg-card/90 px-3 py-2">
-            <p className="text-sm text-foreground">{item}</p>
-            <span className="font-mono text-xs text-primary">done</span>
+          "Vercel Frontend Intern",
+          "Stripe Product Analyst",
+          "Figma Design Engineer",
+        ].map((role) => (
+          <div key={role} className="flex items-center gap-3 rounded-xl border border-border bg-card/90 p-3 shadow-sm">
+            <span className="h-4 w-4 rounded border border-primary/30 bg-primary/10" />
+            <p className="min-w-0 text-sm text-foreground">{role}</p>
           </div>
         ))}
+      </div>
+
+      <div className="rounded-xl border border-border bg-card/85 p-3">
+        <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">Generated assets</p>
+        <div className="mt-3 space-y-2">
+          {[
+            { item: "Resume tailored", count: "3x" },
+            { item: "Cover letters drafted", count: "3x" },
+            { item: "Form answers saved", count: "6x" },
+          ].map((row) => (
+            <div
+              key={row.item}
+              className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/25 px-3 py-2"
+            >
+              <p className="text-sm text-foreground">{row.item}</p>
+              <span className="font-mono text-xs text-primary">{row.count}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-3 rounded-lg border border-border bg-primary/5 p-3">
+          <p className="text-xs text-muted-foreground">Confirmation</p>
+          <p className="mt-1 text-sm text-foreground">
+            One confirmation triggers tailored material generation across the full selection.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="rounded-lg border border-border bg-card/90 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">Jobs</p>
+        <p className="mt-1 font-mono text-sm text-foreground">3</p>
+      </div>
+      <div className="rounded-lg border border-border bg-card/90 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">Assets</p>
+        <p className="mt-1 font-mono text-sm text-foreground">12</p>
+      </div>
+      <div className="rounded-lg border border-border bg-card/90 px-3 py-2">
+        <p className="text-[11px] text-muted-foreground">Confirmations</p>
+        <p className="mt-1 font-mono text-sm text-foreground">1</p>
       </div>
     </div>
   </div>
@@ -159,22 +319,34 @@ export const FeaturesBento = () => {
               <div className="min-w-0 flex-1 text-left">
                 <h3 className="text-xl font-semibold md:text-2xl">Interactive Tracker</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Drag real application cards across five pipeline stages to feel how InternIQ keeps momentum visible.
+                  Click stages, inspect a focused application panel, and drag cards across the pipeline without losing context.
                 </p>
               </div>
               <span className="shrink-0 rounded-lg border border-border bg-muted/50 p-2 text-muted-foreground transition-colors group-hover:text-foreground">
                 <ArrowUpRight className="h-4 w-4" aria-hidden />
               </span>
             </Link>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Built from the same status model as the product pipeline, with fit scores and AI completion hints on key roles.
-            </p>
-            <div className="mt-4 flex-1 overflow-hidden rounded-lg border border-border bg-muted/30 p-3 md:mt-5 md:p-4">
-              <div className="mb-3 flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
-                <span className="h-2.5 w-2.5 rounded-full bg-primary/50" />
-                <span className="h-2.5 w-2.5 rounded-full bg-status-offer/70" />
-                <p className="ml-2 font-mono text-xs text-muted-foreground">interniq.app/pipeline</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {TRACKER_PROOF_CHIPS.map((chip) => (
+                <span
+                  key={chip}
+                  className="rounded-full border border-border bg-muted/35 px-2.5 py-1 text-xs text-foreground/90"
+                >
+                  {chip}
+                </span>
+              ))}
+            </div>
+            <div className="mt-4 flex-1 overflow-hidden rounded-xl border border-border bg-gradient-to-br from-card/95 via-card/85 to-muted/45 p-3 md:mt-5 md:p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-destructive/70" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-primary/50" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-status-offer/70" />
+                  <p className="ml-2 font-mono text-xs text-muted-foreground">interniq.app/pipeline</p>
+                </div>
+                <span className="rounded-full border border-border bg-card/80 px-2.5 py-1 text-xs text-muted-foreground">
+                  live workspace
+                </span>
               </div>
               <div className="[transform:perspective(1000px)_rotateX(3deg)]">
                 <InteractiveDemo />
@@ -309,7 +481,7 @@ export const FeaturesBento = () => {
                 />
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
                   <p className="text-sm font-semibold text-card-foreground">Cold Email Generator</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Switch tone, generate the draft, and send a sharper first message.</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Generate a concise, role-aware outreach draft directly from the application context.</p>
                 </div>
               </div>
             </BentoCard>
@@ -330,7 +502,7 @@ export const FeaturesBento = () => {
                         <div className="min-w-0 text-left">
                           <h3 className="text-xl font-semibold md:text-2xl">Smart Apply</h3>
                           <p className="mt-1 text-sm text-muted-foreground">
-                            Select jobs, click once, and generate tailored resumes, cover letters, and application answers for every role in the batch.
+                            Select a handful of roles, confirm once, and let InternIQ generate the tailored material stack for each one.
                           </p>
                         </div>
                       </div>
@@ -340,24 +512,31 @@ export const FeaturesBento = () => {
                     </div>
 
                     <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="rounded-xl border border-border bg-muted/25 p-3">
                         <p className="text-xs uppercase tracking-wider text-muted-foreground">Selected</p>
                         <p className="mt-2 font-mono text-lg font-semibold text-foreground">4 jobs</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="rounded-xl border border-border bg-muted/25 p-3">
                         <p className="text-xs uppercase tracking-wider text-muted-foreground">Generated</p>
                         <p className="mt-2 font-mono text-lg font-semibold text-foreground">12 assets</p>
                       </div>
-                      <div className="rounded-lg border border-border bg-muted/30 p-3">
+                      <div className="rounded-xl border border-border bg-muted/25 p-3">
                         <p className="text-xs uppercase tracking-wider text-muted-foreground">Time saved</p>
                         <p className="mt-2 font-mono text-lg font-semibold text-foreground">3.4 hrs</p>
                       </div>
                     </div>
                   </div>
 
-                  <p className="mt-4 text-sm text-muted-foreground">
-                    This is the compounding workflow: discover, rank, select, and ship tailored materials without breaking focus.
-                  </p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {["discover", "rank", "confirm once", "generate everything"].map((step) => (
+                      <span
+                        key={step}
+                        className="rounded-full border border-border bg-muted/25 px-2.5 py-1 text-xs text-foreground/90"
+                      >
+                        {step}
+                      </span>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="relative">

@@ -20,6 +20,8 @@ interface KanbanCardProps {
   onEdit?: () => void;
   onDelete?: () => void;
   compact?: boolean;
+  landingCompact?: boolean;
+  active?: boolean;
   dragging?: boolean;
   className?: string;
 }
@@ -34,8 +36,13 @@ interface KanbanCardFaceProps {
   onEdit?: () => void;
   onDelete?: () => void;
   compact?: boolean;
+  landingCompact?: boolean;
+  active?: boolean;
   className?: string;
 }
+
+const buildMetaLabel = (date?: string, location?: string) =>
+  [date, location].filter((value): value is string => Boolean(value?.trim())).join(" / ");
 
 export const KanbanCardFace = memo(({
   company,
@@ -47,65 +54,110 @@ export const KanbanCardFace = memo(({
   onEdit,
   onDelete,
   compact = false,
+  landingCompact = false,
+  active = false,
   className,
 }: KanbanCardFaceProps) => {
+  const metadataLabel = buildMetaLabel(date, location);
+  const showActions = !landingCompact && !compact && (Boolean(onEdit) || Boolean(onDelete));
+  const showMetadata = landingCompact || !compact;
+
   return (
     <article
       className={cn(
-        "group flex flex-col gap-3 rounded-xl border border-border bg-card p-4 transition-colors duration-100 hover:border-primary/20",
+        "group flex flex-col border border-border bg-card transition-all duration-200",
+        landingCompact
+          ? "gap-2.5 rounded-lg p-3 shadow-sm hover:border-primary/25 hover:bg-card"
+          : "gap-3 rounded-xl p-4 hover:border-primary/20",
+        active && "border-primary/25 bg-primary/5 shadow-glow-xs",
         className
       )}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[13px] font-semibold text-foreground">{company}</p>
-          <p className="text-sm font-medium text-muted-foreground">{role}</p>
+          <p className={cn("truncate font-semibold text-foreground", landingCompact ? "text-sm" : "text-[13px]")}>
+            {company}
+          </p>
+          <p
+            className={cn(
+              "min-w-0 text-muted-foreground",
+              landingCompact ? "line-clamp-1 text-[13px] font-medium" : "text-sm font-medium"
+            )}
+          >
+            {role}
+          </p>
         </div>
+
         {typeof fitScore === "number" ? (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+          <span
+            className={cn(
+              "inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/10 font-mono text-primary",
+              landingCompact ? "px-2 py-1 text-[11px]" : "px-2 py-0.5 text-xs"
+            )}
+          >
             <Sparkles className="h-3 w-3" aria-hidden />
             {fitScore}%
           </span>
         ) : null}
       </div>
-      {!compact ? (
-        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-          <p>{date} · {location}</p>
+
+      {showMetadata ? (
+        <div
+          className={cn(
+            "flex items-center justify-between gap-2 text-muted-foreground",
+            landingCompact ? "text-[11px]" : "text-[11px]"
+          )}
+        >
+          <p className="min-w-0 truncate">{metadataLabel || "No metadata yet"}</p>
+
           {aiCompletedCount > 0 ? (
-            <div className="flex items-center gap-1" aria-label={`${aiCompletedCount} AI actions completed`}>
-              {Array.from({ length: Math.min(aiCompletedCount, 5) }).map((_, idx) => (
-                <span key={idx} className="h-1.5 w-1.5 rounded-full bg-primary/70" />
-              ))}
+            <div
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-full border border-border bg-muted/40",
+                landingCompact ? "px-2 py-1" : "px-2 py-0.5"
+              )}
+              aria-label={`${aiCompletedCount} AI actions completed`}
+            >
+              <Sparkles className="h-3 w-3 text-primary" aria-hidden />
+              <span className="font-mono text-[10px] text-foreground">{aiCompletedCount}</span>
+              <div className="flex items-center gap-0.5">
+                {Array.from({ length: Math.min(aiCompletedCount, 3) }).map((_, idx) => (
+                  <span key={idx} className="h-1.5 w-1.5 rounded-full bg-primary/70" />
+                ))}
+              </div>
             </div>
           ) : null}
         </div>
       ) : null}
-      <div className="mt-2 flex gap-1 opacity-0 transition group-hover:opacity-100">
-        <button
-          type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onEdit?.();
-          }}
-          aria-label={`Edit ${company}`}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-        <button
-          type="button"
-          className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/20 hover:text-red-300"
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            onDelete?.();
-          }}
-          aria-label={`Delete ${company}`}
-        >
-          <Trash2 className="h-3.5 w-3.5" />
-        </button>
-      </div>
+
+      {showActions ? (
+        <div className="mt-1 flex gap-1 opacity-0 transition group-hover:opacity-100">
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onEdit?.();
+            }}
+            aria-label={`Edit ${company}`}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </button>
+          <button
+            type="button"
+            className="inline-flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-red-500/20 hover:text-red-300"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onDelete?.();
+            }}
+            aria-label={`Delete ${company}`}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      ) : null}
     </article>
   );
 });
@@ -124,6 +176,8 @@ export const KanbanCard = memo(({
   onEdit,
   onDelete,
   compact = false,
+  landingCompact = false,
+  active = false,
   dragging = false,
   className,
 }: KanbanCardProps) => {
@@ -135,6 +189,8 @@ export const KanbanCard = memo(({
     transform: CSS.Transform.toString(sortable.transform),
     transition: sortable.isDragging ? undefined : sortable.transition,
   };
+
+  const showHandle = !landingCompact;
 
   return (
     <article
@@ -166,25 +222,30 @@ export const KanbanCard = memo(({
       data-cursor="drag"
       data-card-id={id}
       className={cn(
-        "cursor-grab select-none touch-none rounded-xl transition-transform duration-100 active:cursor-grabbing",
-        !sortable.isDragging && !dragging && "hover:-translate-y-px",
+        "cursor-grab select-none touch-none transition-transform duration-150 active:cursor-grabbing",
+        landingCompact ? "rounded-lg" : "rounded-xl",
+        !sortable.isDragging && !dragging && !landingCompact && "hover:-translate-y-px",
+        !sortable.isDragging && !dragging && landingCompact && "hover:-translate-y-0.5",
         sortable.isDragging && "opacity-30 blur-[1px]",
         dragging && "scale-[1.01]",
         className
       )}
     >
       <div className="relative">
-        <button
-          type="button"
-          className={cn(
-            "absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-input text-muted-foreground hover:text-foreground",
-            "pointer-events-none opacity-70 md:hidden"
-          )}
-          aria-label="Drag application card"
-          data-cursor="drag"
-        >
-          <GripVertical className="h-4 w-4" />
-        </button>
+        {showHandle ? (
+          <button
+            type="button"
+            className={cn(
+              "absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-md border border-border bg-input text-muted-foreground hover:text-foreground",
+              "pointer-events-none opacity-70 md:hidden"
+            )}
+            aria-label="Drag application card"
+            data-cursor="drag"
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+        ) : null}
+
         <KanbanCardFace
           company={company}
           role={role}
@@ -195,7 +256,9 @@ export const KanbanCard = memo(({
           onEdit={onEdit}
           onDelete={onDelete}
           compact={compact}
-          className="pr-10"
+          landingCompact={landingCompact}
+          active={active}
+          className={showHandle ? "pr-10" : undefined}
         />
       </div>
     </article>

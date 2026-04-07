@@ -16,45 +16,88 @@ const HERO_WORDS = ["discovery", "fit analysis", "smart apply", "tracking"];
 const HERO_SIGNAL_CHIPS = ["4 sources", "AI-ranked", "1-click apply"];
 
 const HeroFallback = () => (
-  <div className="flex h-full flex-col justify-between bg-card/70 p-4">
-    <div className="space-y-2">
-      {[
-        { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
-        { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
-        { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
-      ].map((job, index) => (
-        <div key={job.role} className="rounded-md border border-border bg-card/90 p-3 shadow-sm">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className={cn("h-2 w-2 rounded-full", index === 0 ? "bg-primary" : "bg-muted-foreground/40")} />
-                <p className="text-sm font-medium text-foreground">{job.role}</p>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {job.company} - {job.source}
-              </p>
-            </div>
-            <span className="font-mono text-sm text-primary">{job.score}</span>
-          </div>
+  <div className="grid h-full gap-3 bg-gradient-to-br from-card/95 via-card/90 to-muted/35 p-4 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
+    <div className="flex flex-col">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Discovery command</p>
+          <p className="mt-1 text-sm font-medium text-foreground">Fresh roles, ranked live</p>
         </div>
-      ))}
+        <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary">
+          4 sources
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {[
+          { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
+          { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
+          { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
+        ].map((job, index) => (
+          <div
+            key={job.role}
+            className={cn(
+              "rounded-xl border border-border p-3 shadow-sm",
+              index === 0 ? "bg-primary/5" : "bg-card/90"
+            )}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className={cn("h-2 w-2 rounded-full", index === 0 ? "bg-primary" : "bg-muted-foreground/40")} />
+                  <p className="truncate text-sm font-medium text-foreground">{job.role}</p>
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {job.company} / {job.source}
+                </p>
+              </div>
+              <span className="font-mono text-sm text-primary">{job.score}</span>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
 
-    <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-      <div className="rounded-md border border-border bg-muted/40 p-3">
+    <div className="flex flex-col gap-3">
+      <div className="rounded-xl border border-border bg-card/90 p-3 shadow-sm">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-medium text-foreground">AI evaluation</p>
-          <span className="font-mono text-xs text-primary">92%</span>
+          <p className="text-sm font-medium text-foreground">AI evaluation</p>
+          <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary">
+            92%
+          </span>
         </div>
         <p className="mt-2 text-xs text-muted-foreground">
-          Strengths: React shipping, product intuition, internship-ready scope. Gap: deeper metrics examples.
+          Strongest signals: React shipping, product intuition, internship-ready scope, and clean project ownership.
         </p>
+        <div className="mt-3 space-y-2">
+          {[
+            { label: "Frontend fit", width: "w-[92%]" },
+            { label: "Product signal", width: "w-[88%]" },
+            { label: "Story clarity", width: "w-[76%]" },
+          ].map((item) => (
+            <div key={item.label}>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">{item.label}</p>
+                <p className="font-mono text-xs text-foreground">{item.width.slice(3, -2)}%</p>
+              </div>
+              <div className="mt-1 h-1.5 rounded-full bg-muted">
+                <div className={cn("h-full rounded-full bg-primary", item.width)} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="rounded-md border border-border bg-muted/40 p-3">
-        <p className="text-xs font-medium text-foreground">Batch ready</p>
-        <div className="mt-2 space-y-2">
-          {["2 selected", "Resume tailored", "Answers drafted"].map((item) => (
-            <div key={item} className="flex items-center justify-between gap-2 rounded-md border border-border bg-card/90 px-3 py-2">
+
+      <div className="rounded-xl border border-border bg-card/90 p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm font-medium text-foreground">Smart Apply ready</p>
+          <span className="rounded-full border border-border bg-muted/40 px-2.5 py-1 font-mono text-xs text-foreground">
+            2 jobs
+          </span>
+        </div>
+        <div className="mt-3 space-y-2">
+          {["Resume tailored", "Cover letter drafted", "Answers saved"].map((item) => (
+            <div key={item} className="flex items-center justify-between gap-2 rounded-lg border border-border bg-muted/25 px-3 py-2">
               <p className="text-xs text-foreground">{item}</p>
               <CheckCircle2 className="h-3.5 w-3.5 text-primary" aria-hidden />
             </div>
@@ -69,10 +112,11 @@ const HeroVisual = () => {
   const prefersReducedMotion = useReducedMotion();
 
   const shell = (
-    <div id="hero-demo" className="relative mx-auto w-full max-w-2xl lg:max-w-none">
+    <div id="hero-demo" className="relative mx-auto w-full max-w-[44rem] lg:max-w-none">
       <div className="pointer-events-none absolute inset-x-[10%] top-10 h-40 rounded-full bg-primary/15 blur-3xl" />
 
-      <div className="relative rounded-xl border border-border bg-card/80 p-4 shadow-glow-md backdrop-blur-xl">
+      <div className="relative rounded-[1.25rem] border border-border bg-card/80 p-4 shadow-glow-md backdrop-blur-xl lg:p-5">
+        <div className="pointer-events-none absolute inset-x-10 top-0 h-px bg-gradient-to-r from-transparent via-primary/40 to-transparent" />
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-primary/10 text-primary">
@@ -162,7 +206,7 @@ export const HeroSection = () => {
   }, [prefersReducedMotion]);
 
   return (
-    <section className="relative min-h-screen overflow-hidden px-4 pb-16 pt-28 sm:pb-24 sm:pt-32">
+    <section className="relative min-h-[92vh] overflow-hidden px-4 pb-12 pt-24 sm:pb-20 sm:pt-28 lg:min-h-[calc(100vh-2rem)]">
       <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:24px_24px]" />
 
       <div className="pointer-events-none absolute inset-0">
@@ -170,8 +214,8 @@ export const HeroSection = () => {
         <div className="absolute bottom-[5%] right-[5%] h-[260px] w-[260px] rounded-full bg-accent/10 blur-[90px] sm:h-[360px] sm:w-[360px] sm:blur-[120px]" />
       </div>
 
-      <div className="relative mx-auto grid max-w-7xl items-center gap-12 lg:grid-cols-[52%_48%] lg:gap-10">
-        <div className="space-y-8">
+      <div className="relative mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[51%_49%] lg:gap-8">
+        <div className="space-y-7">
           <SectionReveal>
             <span className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium">
               <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -179,7 +223,7 @@ export const HeroSection = () => {
             </span>
           </SectionReveal>
 
-          <div className="space-y-5">
+          <div className="space-y-4">
             <SectionReveal delay={0.1}>
               <h1 className="font-display text-5xl leading-[0.95] tracking-tight sm:text-6xl md:text-7xl lg:text-8xl">
                 <GradientText className="inline-block">Land Your</GradientText>
@@ -189,7 +233,7 @@ export const HeroSection = () => {
             </SectionReveal>
 
             <SectionReveal delay={0.2}>
-              <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl">
+              <p className="max-w-[58ch] text-base leading-relaxed text-muted-foreground sm:text-lg md:text-xl">
                 Discover internship roles across four sources, rank them with AI, track every application, and generate tailored materials without breaking focus.
               </p>
             </SectionReveal>
@@ -236,11 +280,11 @@ export const HeroSection = () => {
           </SectionReveal>
 
           <SectionReveal delay={0.4}>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-foreground">
+            <div className="flex flex-wrap items-center gap-2.5 pt-1">
+              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-foreground sm:text-sm">
                 4.9/5 from 2,400+ reviews
               </span>
-              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-sm text-muted-foreground">
+              <span className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground sm:text-sm">
                 Used daily by students, interns, and early-career operators
               </span>
             </div>

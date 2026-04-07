@@ -28,7 +28,13 @@ export const LandingVideoFrame = ({
   const [videoReady, setVideoReady] = useState(false);
 
   return (
-    <div className={cn("relative overflow-hidden rounded-lg border border-border bg-muted/30", className)}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-lg border border-border bg-gradient-to-br from-card via-card/90 to-muted/40",
+        className
+      )}
+    >
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-tr from-transparent via-primary/5 to-transparent" />
       {fallback ? <div className="absolute inset-0">{fallback}</div> : null}
 
       {prefersReducedMotion ? (
