@@ -102,7 +102,8 @@ export const PreferencesDialog = ({ open, onOpenChange }: PreferencesDialogProps
           <DialogTitle>Discovery preferences</DialogTitle>
           <DialogDescription>
             Keywords and locations are comma-separated. Greenhouse slugs are short names from the board URL (e.g.
-            anthropic, openai).
+            anthropic, openai). On the free Vercel plan, automated discovery runs once daily; you can still run it
+            manually anytime from Discover.
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-2">
@@ -186,7 +187,7 @@ export const PreferencesDialog = ({ open, onOpenChange }: PreferencesDialogProps
               onChange={(e) => setActive(e.target.checked)}
             />
             <Label htmlFor="disc-active" className="font-normal">
-              Automated discovery enabled (cron)
+              Automated discovery enabled (daily cron on Hobby)
             </Label>
           </div>
         </div>
