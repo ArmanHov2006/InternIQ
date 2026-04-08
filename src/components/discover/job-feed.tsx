@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { ArrowDownWideNarrow, Clock, Compass, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useDiscoverStore, selectFilteredOpportunities } from "@/stores/discover-store";
@@ -21,6 +22,7 @@ import type { Application, Opportunity } from "@/types/database";
 import { getDiscoverEmptyState } from "@/lib/services/discovery/run-feedback";
 
 export const JobFeed = () => {
+  const router = useRouter();
   const opportunities = useDiscoverStore((s) => s.opportunities);
   const loading = useDiscoverStore((s) => s.loading);
   const preferences = useDiscoverStore((s) => s.preferences);
@@ -67,16 +69,33 @@ export const JobFeed = () => {
       });
       const payload = (await res.json()) as {
         error?: string;
-        results?: Array<{ opportunity?: Opportunity; application?: Application }>;
+        results?: Array<{ opportunity?: Opportunity; application?: Application; error?: string }>;
       };
       if (!res.ok) throw new Error(payload.error ?? "Batch failed");
-      for (const r of payload.results ?? []) {
-        if (r.application) addOrUpdateFromApplication(r.application);
+      const results = payload.results ?? [];
+      let successCount = 0;
+      let errorCount = 0;
+      for (const r of results) {
+        if (r.application) {
+          addOrUpdateFromApplication(r.application);
+          successCount++;
+        }
         if (r.opportunity) updateOpportunity(r.opportunity);
+        if (r.error) errorCount++;
       }
-      toast.success(`Processed ${selectedIds.size} job(s).`);
+      const total = selectedIds.size;
       clearSelection();
       setBatchOpen(false);
+      toast.success(
+        `${successCount} of ${total} jobs processed${errorCount > 0 ? ` (${errorCount} failed)` : ""}`,
+        {
+          action: {
+            label: "View in Pipeline",
+            onClick: () => router.push("/dashboard/pipeline"),
+          },
+          duration: 5000,
+        }
+      );
       await fetchOpportunities();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Batch failed.");

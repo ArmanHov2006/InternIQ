@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ExternalLink, Loader2, MapPin, Sparkles, Clock, Building2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { Application, Opportunity } from "@/types/database";
+import { SmartApplyReviewModal } from "./smart-apply-review-modal";
 import {
   getDiscoveryPrimaryScore,
   getDiscoveryVerdictLabel,
@@ -61,6 +62,9 @@ interface JobCardProps {
 export const JobCard = ({ opportunity }: JobCardProps) => {
   const [saving, setSaving] = useState(false);
   const [smartBusy, setSmartBusy] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewApp, setReviewApp] = useState<Application | null>(null);
+  const [reviewDraftAnswers, setReviewDraftAnswers] = useState<string | null>(null);
   const addOrUpdateFromApplication = useKanbanStore((state) => state.addOrUpdateFromApplication);
   const updateOpportunity = useDiscoverStore((state) => state.updateOpportunity);
   const toggleSelect = useDiscoverStore((state) => state.toggleSelect);
@@ -146,10 +150,28 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
       }
       if (payload.application) addOrUpdateFromApplication(payload.application);
       if (payload.opportunity) updateOpportunity(payload.opportunity);
-      toast.success("Saved. Materials generated. Opening job page...");
-      if (opportunity.job_url && opportunity.job_url !== "#") {
-        window.open(opportunity.job_url, "_blank", "noopener,noreferrer");
+
+      // Fetch draft answers for the review modal
+      let draftContent: string | null = null;
+      if (payload.application?.id) {
+        try {
+          const draftRes = await fetch(
+            `/api/applications/draft-answers?application_id=${payload.application.id}`,
+            { credentials: "same-origin" }
+          );
+          if (draftRes.ok) {
+            const draftData = (await draftRes.json()) as { content?: string } | null;
+            draftContent = draftData?.content ?? null;
+          }
+        } catch {
+          // Draft answers fetch is non-critical
+        }
       }
+
+      // Open review modal instead of toast + window.open
+      setReviewApp(payload.application ?? null);
+      setReviewDraftAnswers(draftContent);
+      setReviewOpen(true);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Smart Apply failed.");
     } finally {
@@ -432,7 +454,10 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
               type="button"
               size="sm"
               variant="secondary"
-              className="h-7 px-2.5 text-xs"
+              className={cn(
+                "h-7 px-2.5 text-xs",
+                smartBusy && "animate-glow-pulse shadow-glow-xs"
+              )}
               disabled={smartBusy}
               onClick={onSmartApply}
             >
@@ -441,11 +466,19 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
               ) : (
                 <Sparkles className="mr-1 h-3 w-3" aria-hidden />
               )}
-              Smart Apply
+              {smartBusy ? "Generating..." : "Smart Apply"}
             </Button>
           </div>
         </div>
       </div>
+
+      <SmartApplyReviewModal
+        open={reviewOpen}
+        onOpenChange={setReviewOpen}
+        application={reviewApp}
+        opportunity={opportunity}
+        draftAnswers={reviewDraftAnswers}
+      />
     </GlassCard>
   );
 };
