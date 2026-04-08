@@ -16,9 +16,7 @@ const buildWhat = (keywords: string[], roleTypes: string[], remoteQuery = false)
   const roles = roleTypes.map((s) => s.trim()).filter(Boolean);
   const qualifiers = remoteQuery ? ["remote"] : [];
 
-  // OR-join top 3 skills for broader matching instead of AND-joining all
   const skillPart = skills.slice(0, 3).join(" OR ");
-  // Always include role types so entry-level filtering reaches the API
   const rolePart = [...roles.slice(0, 2), ...qualifiers].join(" OR ");
 
   if (skillPart && rolePart) return `(${skillPart}) AND (${rolePart})`;
@@ -73,38 +71,37 @@ export const fetchAdzunaJobs = async (input: {
         description?: string;
         salary_min?: number;
         salary_max?: number;
-        salary_is_predicted?: string;
         redirect_url?: string;
         created?: string;
       }>;
     };
 
-    const batch = data.results ?? [];
-    for (const r of batch) {
-      const id = r.id != null ? String(r.id) : "";
-      if (!id || !r.title) continue;
-      const company = r.company?.display_name?.trim() || "Unknown";
-      const loc =
-        Array.isArray(r.location?.display_areas) && r.location.display_areas.length
-          ? r.location.display_areas.join(", ")
+    for (const result of data.results ?? []) {
+      const id = result.id != null ? String(result.id) : "";
+      if (!id || !result.title) continue;
+
+      const company = result.company?.display_name?.trim() || "Unknown";
+      const location =
+        Array.isArray(result.location?.display_areas) && result.location.display_areas.length > 0
+          ? result.location.display_areas.join(", ")
           : "";
-      const desc = (r.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
-      let salary = "";
-      if (r.salary_min != null && r.salary_max != null) {
-        salary = `${r.salary_min}-${r.salary_max}`;
-      }
-      const remote = /\bremote\b/i.test(`${r.title} ${desc} ${loc}`);
+      const description = (result.description ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
+      const salary =
+        result.salary_min != null && result.salary_max != null
+          ? `${result.salary_min}-${result.salary_max}`
+          : "";
+
       all.push({
-        title: r.title.trim(),
+        title: result.title.trim(),
         company,
-        location: loc,
-        description: desc,
+        location,
+        description,
         salary,
-        job_url: r.redirect_url?.trim() || "",
+        job_url: result.redirect_url?.trim() || "",
         api_source: "adzuna",
         api_job_id: `adzuna-${country}-${id}`,
-        is_remote: remote,
-        posted_at: r.created ? new Date(r.created).toISOString() : null,
+        is_remote: /\bremote\b/i.test(`${result.title} ${description} ${location}`),
+        posted_at: result.created ? new Date(result.created).toISOString() : null,
       });
     }
   }

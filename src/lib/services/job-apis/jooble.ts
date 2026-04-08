@@ -32,7 +32,6 @@ export const fetchJoobleJobs = async (input: {
     keywordParts.push("remote");
   }
 
-  const location = input.remoteQuery ? "" : input.locations[0] ?? "";
   const res = await fetch(`${JOOBLE_BASE}/${apiKey}`, {
     method: "POST",
     headers: {
@@ -40,7 +39,7 @@ export const fetchJoobleJobs = async (input: {
     },
     body: JSON.stringify({
       keywords: keywordParts.join(" ").trim(),
-      location,
+      location: input.remoteQuery ? "" : input.locations[0] ?? "",
       page: "1",
     }),
     next: { revalidate: 0 },
@@ -52,45 +51,37 @@ export const fetchJoobleJobs = async (input: {
   }
 
   const data = (await res.json()) as {
-    totalCount?: number;
     jobs?: Array<{
       title?: string;
       location?: string;
       salary?: string;
       snippet?: string;
       type?: string;
-      source?: string;
       link?: string;
       company?: string;
       updated?: string;
     }>;
   };
 
-  const jobs = data.jobs ?? [];
-  const out: NormalizedJob[] = [];
+  return (data.jobs ?? [])
+    .filter((job) => job.title && job.link)
+    .map((job) => {
+      const title = job.title!.trim();
+      const location = (job.location ?? "").trim();
+      const description = (job.snippet ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
+      const link = job.link!.trim();
 
-  for (const job of jobs) {
-    if (!job.title || !job.link) continue;
-
-    const title = job.title.trim();
-    const company = (job.company ?? "Unknown").trim() || "Unknown";
-    const loc = (job.location ?? "").trim();
-    const desc = (job.snippet ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
-    const link = job.link.trim();
-
-    out.push({
-      title,
-      company,
-      location: loc,
-      description: desc,
-      salary: (job.salary ?? "").trim(),
-      job_url: link,
-      api_source: "jooble",
-      api_job_id: `jooble-${Buffer.from(link).toString("base64url").slice(0, 40)}`,
-      is_remote: /\bremote\b/i.test(`${title} ${loc} ${job.type ?? ""}`),
-      posted_at: toIsoOrNull(job.updated),
+      return {
+        title,
+        company: (job.company ?? "Unknown").trim() || "Unknown",
+        location,
+        description,
+        salary: (job.salary ?? "").trim(),
+        job_url: link,
+        api_source: "jooble" as const,
+        api_job_id: `jooble-${Buffer.from(link).toString("base64url").slice(0, 40)}`,
+        is_remote: /\bremote\b/i.test(`${title} ${location} ${job.type ?? ""}`),
+        posted_at: toIsoOrNull(job.updated),
+      };
     });
-  }
-
-  return out;
 };

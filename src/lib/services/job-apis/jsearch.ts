@@ -42,7 +42,6 @@ export const fetchJSearchJobs = async (input: {
 
   const query = buildQuery(input.keywords, input.locations, input.roleTypes, input.remoteQuery);
   const employmentTypes = hasEntryLevelRoleTypes(input.roleTypes) ? "INTERN,FULLTIME" : "FULLTIME";
-
   const params = new URLSearchParams({
     query,
     page: "1",
@@ -51,8 +50,7 @@ export const fetchJSearchJobs = async (input: {
     employment_types: employmentTypes,
   });
 
-  const url = `${JSEARCH_BASE}?${params.toString()}`;
-  const res = await fetch(url, {
+  const res = await fetch(`${JSEARCH_BASE}?${params.toString()}`, {
     headers: {
       "X-RapidAPI-Key": apiKey,
       "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
@@ -79,39 +77,32 @@ export const fetchJSearchJobs = async (input: {
       job_apply_link?: string;
       job_posted_at_datetime_utc?: string;
       job_is_remote?: boolean;
-      job_employment_type?: string;
     }>;
   };
 
-  const jobs = data.data ?? [];
-  const out: NormalizedJob[] = [];
+  return (data.data ?? [])
+    .filter((job) => job.job_id && job.job_title)
+    .map((job) => {
+      const location = [job.job_city, job.job_state, job.job_country].filter(Boolean).join(", ");
+      const description = (job.job_description ?? "").slice(0, 8000);
+      const salary =
+        job.job_min_salary != null && job.job_max_salary != null
+          ? `${job.job_min_salary}-${job.job_max_salary}`
+          : "";
 
-  for (const j of jobs) {
-    if (!j.job_id || !j.job_title) continue;
-
-    const locParts = [j.job_city, j.job_state, j.job_country].filter(Boolean);
-    const loc = locParts.join(", ");
-    const desc = (j.job_description ?? "").slice(0, 8000);
-    let salary = "";
-    if (j.job_min_salary != null && j.job_max_salary != null) {
-      salary = `${j.job_min_salary}-${j.job_max_salary}`;
-    }
-
-    out.push({
-      title: j.job_title.trim(),
-      company: (j.employer_name ?? "Unknown").trim(),
-      location: loc || (j.job_is_remote ? "Remote" : ""),
-      description: desc,
-      salary,
-      job_url: (j.job_apply_link ?? "").trim(),
-      api_source: "jsearch",
-      api_job_id: `jsearch-${j.job_id}`,
-      is_remote: Boolean(j.job_is_remote),
-      posted_at: j.job_posted_at_datetime_utc
-        ? new Date(j.job_posted_at_datetime_utc).toISOString()
-        : null,
+      return {
+        title: job.job_title!.trim(),
+        company: (job.employer_name ?? "Unknown").trim(),
+        location: location || (job.job_is_remote ? "Remote" : ""),
+        description,
+        salary,
+        job_url: (job.job_apply_link ?? "").trim(),
+        api_source: "jsearch" as const,
+        api_job_id: `jsearch-${job.job_id}`,
+        is_remote: Boolean(job.job_is_remote),
+        posted_at: job.job_posted_at_datetime_utc
+          ? new Date(job.job_posted_at_datetime_utc).toISOString()
+          : null,
+      };
     });
-  }
-
-  return out;
 };

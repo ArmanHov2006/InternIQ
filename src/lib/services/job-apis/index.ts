@@ -5,7 +5,6 @@ import { fetchJobicyJobs } from "./jobicy";
 import { fetchJSearchJobs } from "./jsearch";
 import { fetchRemoteOKJobs } from "./remoteok";
 import { fetchJoobleJobs } from "./jooble";
-import { fetchSearchApiJobs } from "./searchapi";
 import { fetchTheMuseJobs } from "./themuse";
 import { fetchUsajobsJobs } from "./usajobs";
 import { buildDiscoverySourceAvailability, isDiscoverySourceEnabled } from "./source-registry";
@@ -495,24 +494,6 @@ export async function fetchAllDiscoveryJobs(
         timeoutMs,
         runLocationAwareSource("usajobs", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
           fetchUsajobsJobs({
-            keywords: input.keywords,
-            locations,
-            roleTypes: input.roleTypes,
-            remoteQuery,
-            signal,
-          })
-        )
-      )
-    );
-  }
-
-  if (isDiscoverySourceEnabled(sourceAvailability, "searchapi")) {
-    tasks.push(
-      executeSource(
-        "searchapi",
-        timeoutMs,
-        runLocationAwareSource("searchapi", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
-          fetchSearchApiJobs({
             keywords: input.keywords,
             locations,
             roleTypes: input.roleTypes,

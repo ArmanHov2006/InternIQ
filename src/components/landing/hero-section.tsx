@@ -13,7 +13,7 @@ import { cn } from "@/lib/utils";
 import { ArrowUpRight, CheckCircle2, Search, Sparkles, Zap } from "lucide-react";
 
 const HERO_WORDS = ["discovery", "fit analysis", "smart apply", "tracking"];
-const HERO_SIGNAL_CHIPS = ["4 sources", "AI-ranked", "1-click apply"];
+const HERO_SIGNAL_CHIPS = ["9 sources", "AI-ranked", "1-click apply"];
 
 const HeroFallback = () => (
   <div className="grid h-full gap-3 bg-gradient-to-br from-card/95 via-card/90 to-muted/35 p-4 md:grid-cols-[minmax(0,1.08fr)_minmax(0,0.92fr)]">
@@ -24,15 +24,15 @@ const HeroFallback = () => (
           <p className="mt-1 text-sm font-medium text-foreground">Fresh roles, ranked live</p>
         </div>
         <span className="rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1 font-mono text-xs text-primary">
-          4 sources
+          9 sources
         </span>
       </div>
 
       <div className="mt-3 space-y-2">
         {[
           { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
-          { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
-          { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
+          { role: "Backend Intern", company: "Plaid", source: "The Muse", score: "84%" },
+          { role: "Design Engineer", company: "Figma", source: "Adzuna", score: "79%" },
         ].map((job, index) => (
           <div
             key={job.role}

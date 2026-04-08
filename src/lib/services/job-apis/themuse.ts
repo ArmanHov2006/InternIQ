@@ -13,33 +13,33 @@ type MuseJob = {
 };
 
 const normalizeBatch = (results: MuseJob[], keywords: string[]): NormalizedJob[] => {
-  const keywordNeedle = keywords.map((k) => k.toLowerCase()).filter(Boolean);
-  const out: NormalizedJob[] = [];
+  const keywordNeedle = keywords.map((keyword) => keyword.toLowerCase()).filter(Boolean);
 
-  for (const r of results) {
-    if (r.id == null || !r.name) continue;
-    const desc = (r.contents ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
-    const title = r.name.trim();
-    if (keywordNeedle.length > 0) {
-      const hay = `${title} ${desc}`.toLowerCase();
-      if (!keywordNeedle.some((k) => hay.includes(k))) continue;
-    }
-    const locs = (r.locations ?? []).map((l) => l.name).filter(Boolean).join(", ");
-    out.push({
-      title,
-      company: (r.company?.name ?? "Unknown").trim(),
-      location: locs,
-      description: desc,
-      salary: "",
-      job_url: (r.refs?.landing_page ?? "").trim(),
-      api_source: "themuse",
-      api_job_id: `themuse-${r.id}`,
-      is_remote: /\bremote\b/i.test(`${title} ${desc} ${locs}`),
-      posted_at: r.publication_date ? new Date(r.publication_date).toISOString() : null,
+  return results
+    .filter((job) => job.id != null && job.name)
+    .map((job) => {
+      const description = (job.contents ?? "").replace(/<[^>]+>/g, " ").slice(0, 8000);
+      const title = job.name!.trim();
+      const location = (job.locations ?? []).map((item) => item.name).filter(Boolean).join(", ");
+
+      return {
+        title,
+        company: (job.company?.name ?? "Unknown").trim(),
+        location,
+        description,
+        salary: "",
+        job_url: (job.refs?.landing_page ?? "").trim(),
+        api_source: "themuse" as const,
+        api_job_id: `themuse-${job.id}`,
+        is_remote: /\bremote\b/i.test(`${title} ${description} ${location}`),
+        posted_at: job.publication_date ? new Date(job.publication_date).toISOString() : null,
+      };
+    })
+    .filter((job) => {
+      if (keywordNeedle.length === 0) return true;
+      const haystack = `${job.title} ${job.description}`.toLowerCase();
+      return keywordNeedle.some((keyword) => haystack.includes(keyword));
     });
-  }
-
-  return out;
 };
 
 export const fetchTheMuseJobs = async (input: {
@@ -47,34 +47,39 @@ export const fetchTheMuseJobs = async (input: {
   pageCount?: number;
   signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
-  const apiKey = process.env.THEMUSE_API_KEY;
-  if (!apiKey) {
-    throw new Error("The Muse API key not configured");
-  }
-
+  const apiKey = process.env.THEMUSE_API_KEY?.trim();
   const pageCount = Math.max(1, Math.min(input.pageCount ?? 1, 3));
-  const category = "all";
-  const settled = await Promise.allSettled(
-    Array.from({ length: pageCount }, async (_, index) => {
-      const page = index + 1;
-      const url = `${MUSE_BASE}?page=${page}&api_key=${encodeURIComponent(apiKey)}&category=${category}`;
-      const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
-      if (!res.ok) {
-        throw new Error(`The Muse HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as { results?: MuseJob[] };
-      return normalizeBatch(data.results ?? [], input.keywords);
-    })
-  );
+  const requests = Array.from({ length: pageCount }, async (_, index) => {
+    const params = new URLSearchParams({
+      page: String(index + 1),
+      category: "all",
+    });
+    if (apiKey) {
+      params.set("api_key", apiKey);
+    }
 
-  const out: NormalizedJob[] = [];
+    const res = await fetch(`${MUSE_BASE}?${params.toString()}`, {
+      next: { revalidate: 0 },
+      signal: input.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`The Muse HTTP ${res.status}`);
+    }
+
+    const data = (await res.json()) as { results?: MuseJob[] };
+    return normalizeBatch(data.results ?? [], input.keywords);
+  });
+
+  const settled = await Promise.allSettled(requests);
+  const jobs: NormalizedJob[] = [];
+
   for (const result of settled) {
     if (result.status === "fulfilled") {
-      out.push(...result.value);
+      jobs.push(...result.value);
       continue;
     }
     throw result.reason;
   }
 
-  return out;
+  return jobs;
 };

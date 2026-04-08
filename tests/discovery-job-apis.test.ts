@@ -17,6 +17,8 @@ describe("discovery job api filters", () => {
     delete process.env.ADZUNA_APP_ID;
     delete process.env.ADZUNA_APP_KEY;
     delete process.env.THEMUSE_API_KEY;
+    delete process.env.JSEARCH_API_KEY;
+    delete process.env.JOOBLE_API_KEY;
   });
 
   it("skips senior jobicy roles for entry-level searches", async () => {
@@ -103,8 +105,8 @@ describe("discovery job api filters", () => {
         description: "",
         salary: "",
         job_url: "https://example.com/principal",
-        api_source: "themuse",
-        api_job_id: "m-1",
+        api_source: "jsearch",
+        api_job_id: "j-0",
         is_remote: true,
         posted_at: null,
       },
@@ -184,6 +186,9 @@ describe("discovery job api filters", () => {
       if (url.includes("api.adzuna.com")) {
         return { ok: true, json: async () => ({ results: [] }) };
       }
+      if (url.includes("themuse.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
       if (url.includes("jobicy.com")) {
         return { ok: true, json: async () => ({ jobs: [] }) };
       }
@@ -228,12 +233,15 @@ describe("discovery job api filters", () => {
     ).toBe(true);
   });
 
-  it("surfaces disabled keyed sources in source availability", async () => {
+  it("surfaces keyed free-tier sources in source availability", async () => {
     process.env.ADZUNA_APP_ID = "app-id";
     process.env.ADZUNA_APP_KEY = "app-key";
 
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("api.adzuna.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      if (url.includes("themuse.com")) {
         return { ok: true, json: async () => ({ results: [] }) };
       }
       if (url.includes("jobicy.com")) {
@@ -260,10 +268,28 @@ describe("discovery job api filters", () => {
       sourceTimeoutMs: 250,
     });
 
+    expect(Object.keys(result.sourceAvailability).sort()).toEqual([
+      "adzuna",
+      "greenhouse",
+      "himalayas",
+      "jobicy",
+      "jooble",
+      "jsearch",
+      "remoteok",
+      "themuse",
+      "usajobs",
+    ]);
     expect(result.sourceAvailability.adzuna?.enabled).toBe(true);
+    expect(result.sourceAvailability.themuse?.enabled).toBe(true);
+    expect(result.sourceAvailability.themuse?.paid).toBe(false);
     expect(result.sourceAvailability.jsearch?.enabled).toBe(false);
     expect(result.sourceAvailability.jsearch?.reason).toContain("JSEARCH_API_KEY");
-    expect(result.sourceAvailability.searchapi?.enabled).toBe(false);
+    expect(result.sourceAvailability.jsearch?.paid).toBe(false);
+    expect(result.sourceAvailability.jooble?.enabled).toBe(false);
+    expect(result.sourceAvailability.jooble?.reason).toContain("JOOBLE_API_KEY");
+    expect(result.sourceAvailability.jooble?.paid).toBe(false);
+    expect(result.sourceAvailability.usajobs?.enabled).toBe(false);
+    expect(result.sourceAvailability.usajobs?.reason).toContain("USAJOBS_API_KEY");
   });
 
   it("requests expanded greenhouse content and uses location.name", async () => {
@@ -338,10 +364,12 @@ describe("discovery job api filters", () => {
   it("requests broader himalayas coverage and multiple adzuna pages", async () => {
     process.env.ADZUNA_APP_ID = "app-id";
     process.env.ADZUNA_APP_KEY = "app-key";
-    process.env.THEMUSE_API_KEY = "muse-key";
 
     const fetchMock = vi.fn(async (url: string) => {
       if (url.includes("api.adzuna.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      if (url.includes("themuse.com")) {
         return { ok: true, json: async () => ({ results: [] }) };
       }
       if (url.includes("jobicy.com")) {
@@ -352,9 +380,6 @@ describe("discovery job api filters", () => {
       }
       if (url.includes("himalayas.app")) {
         return { ok: true, json: async () => ({ jobs: [] }) };
-      }
-      if (url.includes("themuse.com")) {
-        return { ok: true, json: async () => ({ results: [] }) };
       }
       throw new Error(`Unexpected fetch: ${url}`);
     });
@@ -374,16 +399,16 @@ describe("discovery job api filters", () => {
     const adzunaCalls = fetchMock.mock.calls
       .map(([url]) => String(url))
       .filter((url) => url.includes("api.adzuna.com"));
-    const himalayasCalls = fetchMock.mock.calls
-      .map(([url]) => String(url))
-      .filter((url) => url.includes("himalayas.app"));
     const museCalls = fetchMock.mock.calls
       .map(([url]) => String(url))
       .filter((url) => url.includes("themuse.com"));
+    const himalayasCalls = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("himalayas.app"));
 
     expect(adzunaCalls).toHaveLength(8);
-    expect(himalayasCalls).toHaveLength(3);
     expect(museCalls).toHaveLength(3);
+    expect(himalayasCalls).toHaveLength(3);
   });
 
   it("still excludes fully remote jobs when onsite is required", () => {
@@ -436,6 +461,9 @@ describe("discovery job api filters", () => {
         });
       }
       if (url.includes("api.adzuna.com")) {
+        return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
+      }
+      if (url.includes("themuse.com")) {
         return Promise.resolve({ ok: true, json: async () => ({ results: [] }) });
       }
       if (url.includes("jobicy.com")) {

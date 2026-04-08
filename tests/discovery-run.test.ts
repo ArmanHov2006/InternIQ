@@ -245,16 +245,15 @@ const seniorDevOpsJob: NormalizedJob = {
 };
 
 const defaultSourceAvailability: Record<JobApiSource, DiscoverySourceAvailability> = {
-  adzuna: { enabled: true, keyed: true, paid: true, requiresEnv: ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"], reason: null },
+  adzuna: { enabled: true, keyed: true, paid: false, requiresEnv: ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"], reason: null },
   greenhouse: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
-  themuse: { enabled: false, keyed: true, paid: true, requiresEnv: ["THEMUSE_API_KEY"], reason: "Missing THEMUSE_API_KEY" },
-  jsearch: { enabled: false, keyed: true, paid: true, requiresEnv: ["JSEARCH_API_KEY"], reason: "Missing JSEARCH_API_KEY" },
+  themuse: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
+  jsearch: { enabled: false, keyed: true, paid: false, requiresEnv: ["JSEARCH_API_KEY"], reason: "Missing JSEARCH_API_KEY" },
   himalayas: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
   jobicy: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
   remoteok: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
-  jooble: { enabled: false, keyed: true, paid: true, requiresEnv: ["JOOBLE_API_KEY"], reason: "Missing JOOBLE_API_KEY" },
+  jooble: { enabled: false, keyed: true, paid: false, requiresEnv: ["JOOBLE_API_KEY"], reason: "Missing JOOBLE_API_KEY" },
   usajobs: { enabled: false, keyed: true, paid: false, requiresEnv: ["USAJOBS_API_KEY", "USAJOBS_EMAIL"], reason: "Missing USAJOBS_API_KEY, USAJOBS_EMAIL" },
-  searchapi: { enabled: false, keyed: true, paid: true, requiresEnv: ["SEARCHAPI_API_KEY"], reason: "Missing SEARCHAPI_API_KEY" },
 };
 
 const buildFetchResult = (

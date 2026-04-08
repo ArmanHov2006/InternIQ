@@ -243,7 +243,7 @@ export interface DiscoveryPreferences {
 export interface DiscoveryRun {
   id: string;
   user_id: string;
-  api_source: "adzuna" | "themuse" | "remotive" | "greenhouse" | "aggregate";
+  api_source: "aggregate";
   query_params: Record<string, unknown>;
   results_count: number;
   new_opportunities_count: number;

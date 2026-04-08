@@ -11,7 +11,7 @@ import { ArrowUpRight, Bot, Mail, Sparkles, Zap } from "lucide-react";
 
 const PIPELINE_FROM_FEATURES = "/dashboard/pipeline?from=features";
 const DISCOVER_ROUTE = "/dashboard/discover";
-const DISCOVERY_SOURCES = ["Adzuna", "Remotive", "Greenhouse", "The Muse"];
+const DISCOVERY_SOURCES = ["Adzuna", "Greenhouse", "Himalayas", "JSearch", "Jobicy", "Jooble", "RemoteOK", "The Muse", "USAJobs"];
 const TRACKER_PROOF_CHIPS = ["5 stages", "drag live", "AI signals"];
 
 const featureCardLinkClass =
@@ -36,8 +36,8 @@ const DiscoveryFallback = () => (
       <div className="space-y-2">
         {[
           { role: "Frontend Intern", company: "Vercel", source: "Greenhouse", score: "91%" },
-          { role: "Product Analyst", company: "Stripe", source: "The Muse", score: "84%" },
-          { role: "Design Engineer", company: "Figma", source: "Remotive", score: "79%" },
+          { role: "Backend Intern", company: "Plaid", source: "The Muse", score: "84%" },
+          { role: "Design Engineer", company: "Figma", source: "Adzuna", score: "79%" },
         ].map((job, index) => (
           <div
             key={job.role}
@@ -366,7 +366,7 @@ export const FeaturesBento = () => {
                   <div className="min-w-0 text-left">
                     <h3 className="text-xl font-semibold">Job Discovery</h3>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Auto-find roles from Adzuna, Remotive, Greenhouse &amp; The Muse, then rank them against your profile with AI.
+                      Auto-find roles from Adzuna, Greenhouse, Himalayas, JSearch, Jobicy, Jooble, RemoteOK, The Muse, and USAJobs, then rank them against your profile with AI.
                     </p>
                   </div>
                 </div>
@@ -397,10 +397,10 @@ export const FeaturesBento = () => {
                 <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-end justify-between gap-3 bg-gradient-to-t from-card via-card/80 to-transparent p-4">
                   <div>
                     <p className="text-sm font-semibold text-card-foreground">Job Discovery</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Four sources in one feed, scored before you even open the drawer.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Nine sources in one feed, scored before you even open the drawer.</p>
                   </div>
                   <span className="rounded-full border border-primary/20 bg-card/90 px-2.5 py-1 text-xs font-mono text-primary shadow-sm">
-                    4 sources
+                    9 sources
                   </span>
                 </div>
               </div>
