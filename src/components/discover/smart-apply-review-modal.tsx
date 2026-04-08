@@ -89,8 +89,8 @@ export function SmartApplyReviewModal({
   const handleOpenJob = () => {
     if (jobUrl && jobUrl !== "#") {
       window.open(jobUrl, "_blank", "noopener,noreferrer");
+      toast.success("Opening job page. Good luck!");
     }
-    toast.success("Opening job page. Good luck!");
     onOpenChange(false);
   };
 
@@ -221,7 +221,7 @@ export function SmartApplyReviewModal({
                       scoreColor(matchScore)
                     )}
                   >
-                    {matchScore ?? "--"}%
+                    {matchScore != null ? `${matchScore}%` : "--"}
                   </span>
                 </div>
                 {opportunity.match_summary ? (
@@ -305,7 +305,7 @@ export function SmartApplyReviewModal({
             disabled={!jobUrl || jobUrl === "#"}
           >
             <ExternalLink className="mr-1.5 h-3.5 w-3.5" aria-hidden />
-            Open Job &amp; Apply
+            Open Job & Apply
           </Button>
         </DialogFooter>
       </DialogContent>
