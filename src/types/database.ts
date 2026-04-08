@@ -144,6 +144,51 @@ export interface Opportunity {
 
 export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
 
+export type DiscoveryRunReasonCode =
+  | "success"
+  | "no_source_results"
+  | "location_filtered_out"
+  | "seniority_filtered_out"
+  | "score_threshold_filtered_out"
+  | "all_refreshed"
+  | "source_errors";
+
+export interface DiscoverySourceStat {
+  count: number;
+  durationMs: number;
+  timedOut: boolean;
+  error: string | null;
+}
+
+export interface DiscoveryRunDiagnostics {
+  reasonCode: DiscoveryRunReasonCode;
+  secondaryIssues: DiscoveryRunReasonCode[];
+  effectiveContext: {
+    locations: string[];
+    remote_preference: RemotePreference;
+    role_types: string[];
+  };
+  executedContext: {
+    keywords: string[];
+    locations: string[];
+    source_query_locations: string[];
+    role_types: string[];
+    remote_preference: RemotePreference;
+  };
+  stageCounts: {
+    fetched: number;
+    afterRemote: number;
+    afterLocation: number;
+    afterSeniority: number;
+    afterThreshold: number;
+    active: number;
+    inserted: number;
+    updated: number;
+    reactivated: number;
+  };
+  sourceStats: Record<string, DiscoverySourceStat>;
+}
+
 export interface DiscoveryResumeContextOverrides {
   skills: string[];
   locations: string[];
@@ -211,6 +256,7 @@ export interface MatchInsight {
   summary: string;
   matched_keywords: string[];
   missing_keywords: string[];
+  gating_flags?: string[];
 }
 
 export interface ApplicationContact {

@@ -18,17 +18,15 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { ContextChipList } from "./context-chip-editor";
+import {
+  formatRunFeedback,
+  type RunFeedback,
+} from "@/lib/services/discovery/run-feedback";
 
 interface PreferencesBarProps {
   onOpenPrefs: () => void;
   onOpenAdvanced: () => void;
 }
-
-type RunFeedback = {
-  tone: "success" | "warning" | "error";
-  message: string;
-  sourceErrors?: Record<string, string>;
-};
 
 const getResumeStatus = (hasResume: boolean, enabled: boolean): { label: string; tone: string } => {
   if (!hasResume) return { label: "No resume detected", tone: "warning" };
@@ -52,38 +50,46 @@ export const PreferencesBar = ({ onOpenPrefs, onOpenAdvanced }: PreferencesBarPr
 
   const onRun = async () => {
     setRunFeedback(null);
-    const { error, sourceErrors, resultsCount, newOpportunitiesCount } = await runDiscovery();
+    const {
+      error,
+      sourceErrors,
+      reviewedCount,
+      activeCount,
+      archivedCount,
+      updatedCount,
+      reactivatedCount,
+      newOpportunitiesCount,
+      diagnostics,
+    } = await runDiscovery();
     if (error) {
-      setRunFeedback({ tone: "error", message: error, sourceErrors });
+      setRunFeedback({ tone: "error", message: error, details: [], sourceErrors });
       setLiveMessage(error);
       toast.error(error);
       return;
     }
 
+    const reviewed = reviewedCount ?? 0;
+    const visible = activeCount ?? 0;
+    const hidden = archivedCount ?? 0;
     const inserted = newOpportunitiesCount ?? 0;
-    if ((resultsCount ?? 0) > 0 && inserted === 0) {
-      const message = `Reviewed ${resultsCount} roles, but none matched closely enough. Try adjusting your context or lowering the minimum score.`;
-      setRunFeedback({ tone: "warning", message, sourceErrors });
-      setLiveMessage(message);
-      return;
+    const updated = updatedCount ?? 0;
+    const reactivated = reactivatedCount ?? 0;
+    const feedback = formatRunFeedback({
+      diagnostics,
+      minMatchScore: preferences?.min_match_score ?? 55,
+      reviewed,
+      visible,
+      hidden,
+      inserted,
+      updated,
+      reactivated,
+      sourceErrors,
+    });
+    setRunFeedback(feedback);
+    setLiveMessage(feedback.message);
+    if (feedback.tone === "success" && reviewed > 0) {
+      toast.success(feedback.message);
     }
-
-    if (sourceErrors && Object.keys(sourceErrors).length > 0) {
-      const reviewed = resultsCount ?? inserted;
-      const message = `Found ${inserted} new match${inserted === 1 ? "" : "es"} from ${reviewed} roles reviewed. Some sources had issues.`;
-      setRunFeedback({ tone: "warning", message, sourceErrors });
-      setLiveMessage(message);
-      return;
-    }
-
-    const reviewed = resultsCount ?? inserted;
-    const message =
-      inserted > 0
-        ? `Found ${inserted} new match${inserted === 1 ? "" : "es"} from ${reviewed} roles reviewed.`
-        : "Discovery ran successfully with your saved context.";
-    setRunFeedback({ tone: "success", message });
-    setLiveMessage(message);
-    if (inserted > 0) toast.success(message);
   };
 
   const onAutoFill = async () => {
@@ -277,14 +283,11 @@ export const PreferencesBar = ({ onOpenPrefs, onOpenAdvanced }: PreferencesBarPr
           aria-live="polite"
         >
           <p>{runFeedback.message}</p>
-          {runFeedback.sourceErrors && Object.keys(runFeedback.sourceErrors).length > 0 ? (
-            <p className="mt-1 text-xs opacity-80">
-              Source issues:{" "}
-              {Object.entries(runFeedback.sourceErrors)
-                .map(([source, message]) => `${source}: ${message}`)
-                .join(" | ")}
+          {runFeedback.details.map((detail) => (
+            <p key={detail} className="mt-1 text-xs opacity-80">
+              {detail}
             </p>
-          ) : null}
+          ))}
         </div>
       ) : null}
     </div>

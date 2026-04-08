@@ -9,12 +9,14 @@ const ENTRY_RE = /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|g
 export const fetchRemoteOKJobs = async (input: {
   keywords: string[];
   roleTypes: string[];
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const res = await fetch(REMOTEOK_URL, {
     next: { revalidate: 0 },
     headers: {
       "User-Agent": "InternIQ/1.0 (job-discovery)",
     },
+    signal: input.signal,
   });
   if (!res.ok) {
     throw new Error(`RemoteOK HTTP ${res.status}`);

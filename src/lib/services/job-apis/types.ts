@@ -28,15 +28,41 @@ export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
 export interface DiscoveryFetchInput {
   keywords: string[];
   locations: string[];
+  sourceQueryLocations?: string[];
   remotePreference: RemotePreference;
   roleTypes: string[];
   excludedCompanies: string[];
   greenhouseSlugs: string[];
   adzunaMaxPages?: number;
+  sourceTimeoutMs?: number;
+}
+
+export interface SourceFetchStat {
+  count: number;
+  durationMs: number;
+  timedOut: boolean;
+  error: string | null;
 }
 
 export interface SourceFetchResult {
   source: JobApiSource;
   jobs: NormalizedJob[];
+  durationMs: number;
+  timedOut: boolean;
   error?: string;
+}
+
+export interface DiscoveryFetchStageCounts {
+  fetched: number;
+  afterRemote: number;
+  afterLocation: number;
+  afterSeniority: number;
+}
+
+export interface DiscoveryFetchResult {
+  jobs: NormalizedJob[];
+  sourceErrors: Record<string, string>;
+  sourceStats: Record<string, SourceFetchStat>;
+  sourceQueryLocations: string[];
+  stageCounts: DiscoveryFetchStageCounts;
 }

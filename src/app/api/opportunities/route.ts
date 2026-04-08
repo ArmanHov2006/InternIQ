@@ -14,6 +14,7 @@ import {
   isSupabaseConfigured,
   withAuth,
 } from "@/lib/server/route-utils";
+import { resolveDiscoveryScope } from "@/lib/server/opportunities-route";
 import { isSchemaCompatError } from "@/lib/server/schema-compat";
 
 const discoveryFieldsFromBody = (body: Record<string, unknown>) => {
@@ -48,17 +49,65 @@ const mergeDiscoveryPut = (
   };
 };
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const discoveryScope = resolveDiscoveryScope(request);
     if (!isSupabaseConfigured) {
-      return NextResponse.json(
-        Array.from(demoOpportunityStore.values()).sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0))
-      );
+      const demoRows = Array.from(demoOpportunityStore.values());
+      const filtered =
+        discoveryScope === "latest_shortlist"
+          ? demoRows.filter(
+              (row) => row.source === "recommendation" && row.status === "new" && row.api_source && row.api_job_id
+            )
+          : demoRows;
+      return NextResponse.json(filtered.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0)));
     }
 
     const auth = await withAuth();
     if ("response" in auth) return auth.response;
     const { supabase, user } = auth;
+
+    if (discoveryScope === "latest_shortlist") {
+      const { data: runData, error: runError } = await supabase
+        .from("discovery_runs")
+        .select("id")
+        .eq("user_id", user.id)
+        .order("started_at", { ascending: false })
+        .limit(1);
+
+      if (runError) {
+        return NextResponse.json({ error: runError.message }, { status: 500 });
+      }
+
+      const latestRunId =
+        Array.isArray(runData) && runData[0] && typeof runData[0].id === "string"
+          ? runData[0].id
+          : null;
+
+      if (!latestRunId) {
+        return NextResponse.json([]);
+      }
+
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("source", "recommendation")
+        .eq("status", "new")
+        .eq("discovery_run_id", latestRunId)
+        .not("api_source", "is", null)
+        .order("match_score", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        if (isSchemaCompatError(error)) {
+          return NextResponse.json([]);
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json((data ?? []) as Opportunity[]);
+    }
 
     const { data, error } = await supabase
       .from("opportunities")

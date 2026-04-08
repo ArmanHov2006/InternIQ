@@ -1,14 +1,39 @@
 "use client";
 
 import { create } from "zustand";
-import type { DiscoveryPreferences, DiscoveryResumeContextOverrides, Opportunity } from "@/types/database";
+import type {
+  DiscoveryPreferences,
+  DiscoveryResumeContextOverrides,
+  DiscoveryRunDiagnostics,
+  Opportunity,
+} from "@/types/database";
+import { getDiscoveryPrimaryScore } from "@/lib/services/discovery/ai-scorer";
 
 export type DiscoverSort = "match" | "newest";
 export type DiscoverFilter = "all" | "new" | "saved";
 
+export type DiscoveryRunSummary = {
+  runId: string;
+  reviewedCount: number;
+  activeCount: number;
+  archivedCount: number;
+  updatedCount: number;
+  reactivatedCount: number;
+  newOpportunitiesCount: number;
+  sourceErrors?: Record<string, string>;
+  diagnostics?: DiscoveryRunDiagnostics;
+};
+
+type DiscoveryRunResponse = Partial<DiscoveryRunSummary> & {
+  error?: string;
+  resultsCount?: number;
+  sourceErrors?: Record<string, string>;
+};
+
 interface DiscoverState {
   preferences: DiscoveryPreferences | null;
   opportunities: Opportunity[];
+  latestRunSummary: DiscoveryRunSummary | null;
   loading: boolean;
   running: boolean;
   scoring: boolean;
@@ -23,16 +48,12 @@ interface DiscoverState {
   setScoring: (v: boolean) => void;
   setSort: (s: DiscoverSort) => void;
   setFilter: (f: DiscoverFilter) => void;
+  setLatestRunSummary: (summary: DiscoveryRunSummary | null) => void;
   toggleSelect: (id: string) => void;
   clearSelection: () => void;
   fetchPreferences: () => Promise<void>;
   fetchOpportunities: () => Promise<void>;
-  runDiscovery: () => Promise<{
-    error?: string;
-    sourceErrors?: Record<string, string>;
-    resultsCount?: number;
-    newOpportunitiesCount?: number;
-  }>;
+  runDiscovery: () => Promise<DiscoveryRunResponse>;
   autoFillFromResume: () => Promise<{
     error?: string;
     overrides?: DiscoveryResumeContextOverrides;
@@ -46,6 +67,7 @@ const isDiscovered = (o: Opportunity) => Boolean(o.api_source && o.api_job_id);
 export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   preferences: null,
   opportunities: [],
+  latestRunSummary: null,
   loading: true,
   running: false,
   scoring: false,
@@ -61,6 +83,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   setScoring: (scoring) => set({ scoring }),
   setSort: (sort) => set({ sort }),
   setFilter: (filter) => set({ filter }),
+  setLatestRunSummary: (latestRunSummary) => set({ latestRunSummary }),
 
   toggleSelect: (id) =>
     set((s) => {
@@ -82,11 +105,21 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   fetchOpportunities: async () => {
     set({ loading: true });
     try {
-      const res = await fetch("/api/opportunities", { credentials: "same-origin" });
+      const res = await fetch("/api/opportunities?discovery_scope=latest_shortlist", {
+        credentials: "same-origin",
+      });
       if (!res.ok) return;
       const data = (await res.json()) as Opportunity[];
-      const discovered = Array.isArray(data) ? data.filter(isDiscovered) : [];
-      set({ opportunities: discovered });
+      const discovered = Array.isArray(data)
+        ? data.filter((opportunity) => isDiscovered(opportunity) && opportunity.status === "new")
+        : [];
+      set((state) => {
+        const visibleIds = new Set(discovered.map((opportunity) => opportunity.id));
+        return {
+          opportunities: discovered,
+          selectedIds: new Set(Array.from(state.selectedIds).filter((id) => visibleIds.has(id))),
+        };
+      });
     } finally {
       set({ loading: false });
     }
@@ -102,17 +135,46 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       const payload = (await res.json()) as {
         error?: string;
         sourceErrors?: Record<string, string>;
+        runId?: string;
+        reviewedCount?: number;
+        activeCount?: number;
+        archivedCount?: number;
+        updatedCount?: number;
+        reactivatedCount?: number;
         resultsCount?: number;
         newOpportunitiesCount?: number;
+        diagnostics?: DiscoveryRunDiagnostics;
       };
       if (!res.ok) {
         return { error: payload.error ?? "Discovery failed", sourceErrors: payload.sourceErrors };
       }
       await get().fetchOpportunities();
       await get().fetchPreferences();
+      if (payload.runId) {
+        set({
+          latestRunSummary: {
+            runId: payload.runId,
+            reviewedCount: payload.reviewedCount ?? payload.resultsCount ?? 0,
+            activeCount: payload.activeCount ?? payload.newOpportunitiesCount ?? 0,
+            archivedCount: payload.archivedCount ?? 0,
+            updatedCount: payload.updatedCount ?? 0,
+            reactivatedCount: payload.reactivatedCount ?? 0,
+            newOpportunitiesCount: payload.newOpportunitiesCount ?? 0,
+            sourceErrors: payload.sourceErrors,
+            diagnostics: payload.diagnostics,
+          },
+        });
+      }
       return {
+        runId: payload.runId,
+        reviewedCount: payload.reviewedCount ?? payload.resultsCount,
+        activeCount: payload.activeCount ?? payload.newOpportunitiesCount,
+        archivedCount: payload.archivedCount,
+        updatedCount: payload.updatedCount,
+        reactivatedCount: payload.reactivatedCount,
         sourceErrors: payload.sourceErrors,
-        resultsCount: payload.resultsCount,
+        diagnostics: payload.diagnostics,
+        resultsCount: payload.reviewedCount ?? payload.resultsCount,
         newOpportunitiesCount: payload.newOpportunitiesCount,
       };
     } catch {
@@ -163,9 +225,16 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   },
 
   updateOpportunity: (row) =>
-    set((s) => ({
-      opportunities: s.opportunities.map((o) => (o.id === row.id ? row : o)),
-    })),
+    set((state) => {
+      const opportunities = state.opportunities
+        .map((opportunity) => (opportunity.id === row.id ? row : opportunity))
+        .filter((opportunity) => opportunity.status === "new");
+      const selectedIds = new Set(state.selectedIds);
+      if (row.status !== "new") {
+        selectedIds.delete(row.id);
+      }
+      return { opportunities, selectedIds };
+    }),
 }));
 
 export const selectFilteredOpportunities = (
@@ -173,12 +242,11 @@ export const selectFilteredOpportunities = (
   filter: DiscoverFilter,
   sort: DiscoverSort
 ): Opportunity[] => {
-  let rows = [...opportunities];
-  if (filter === "new") rows = rows.filter((o) => o.status === "new");
-  if (filter === "saved") rows = rows.filter((o) => o.status === "saved");
+  void filter;
+  const rows = opportunities.filter((opportunity) => opportunity.status === "new");
   rows.sort((a, b) => {
     if (sort === "match") {
-      return (b.match_score ?? 0) - (a.match_score ?? 0);
+      return (getDiscoveryPrimaryScore(b) ?? 0) - (getDiscoveryPrimaryScore(a) ?? 0);
     }
     const ta = a.posted_at || a.created_at;
     const tb = b.posted_at || b.created_at;

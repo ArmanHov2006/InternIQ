@@ -35,7 +35,7 @@ describe("career os utilities", () => {
         "Built React and TypeScript product features and partner closely with analytics teams.",
     });
 
-    expect(insight.score).toBeGreaterThan(50);
+    expect(insight.score).toBeGreaterThanOrEqual(50);
     expect(insight.matched_keywords).toContain("react");
     expect(insight.missing_keywords).toContain("experimentation");
   });
@@ -50,7 +50,7 @@ describe("career os utilities", () => {
       profileKeywords: ["python", "postgresql", "backend"],
     });
 
-    expect(insight.score).toBeGreaterThan(60);
+    expect(insight.score).toBeGreaterThanOrEqual(60);
     expect(insight.matched_keywords).toContain("python");
     expect(insight.matched_keywords).toContain("postgresql");
   });
@@ -82,13 +82,55 @@ describe("career os utilities", () => {
       jobDescription: "Principal Engineer owning architecture for cloud systems in Python.",
     });
 
-    expect(internInsight.score).toBeGreaterThanOrEqual(80);
-    expect(neutralInsight.score).toBeGreaterThanOrEqual(60);
+    expect(internInsight.score).toBeGreaterThanOrEqual(75);
+    expect(neutralInsight.score).toBeGreaterThanOrEqual(55);
     expect(neutralInsight.score).toBeLessThan(80);
     expect(seniorInsight.score).toBeLessThan(50);
     expect(principalInsight.score).toBeLessThan(35);
     expect(internInsight.summary).toContain("entry-level search");
     expect(seniorInsight.summary).toContain("senior-level role");
+    expect(seniorInsight.gating_flags).toContain("seniority_mismatch");
+  });
+
+  it("treats a reasonable junior backend role as shortlist-worthy without requiring a near-perfect match", () => {
+    const insight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Junior Backend Engineer",
+      roleTypes: ["intern", "junior"],
+      jobDescription:
+        "Junior Backend Engineer building Python APIs with FastAPI, PostgreSQL, and Docker for internal tools.",
+    });
+
+    expect(insight.score).toBeGreaterThanOrEqual(55);
+    expect(insight.score).toBeLessThan(85);
+    expect(insight.matched_keywords).toContain("python");
+    expect(insight.matched_keywords).toContain("fastapi");
+  });
+
+  it("keeps weak or noisy overlap below the shortlist threshold", () => {
+    const insight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Growth Marketing Coordinator",
+      roleTypes: ["intern", "junior"],
+      jobDescription:
+        "Coordinate lifecycle campaigns, paid social, copy reviews, and CRM reporting for growth marketing.",
+    });
+
+    expect(insight.score).toBeLessThan(55);
+  });
+
+  it("penalizes multi-year requirements for entry-level discovery", () => {
+    const insight = computeMatchInsight({
+      ...backendResumeInput,
+      jobTitle: "Platform Engineer",
+      roleTypes: ["intern", "junior"],
+      jobDescription:
+        "Platform Engineer building Python backend systems. Requires 5+ years of experience with Docker and cloud infrastructure.",
+    });
+
+    expect(insight.score).toBeLessThan(60);
+    expect(insight.summary).toContain("years of experience");
+    expect(insight.gating_flags).toContain("years_mismatch");
   });
 
   it("keeps the old scoring behavior when no role types are provided", () => {

@@ -5,6 +5,7 @@ const MUSE_BASE = "https://www.themuse.com/api/public/jobs";
 export const fetchTheMuseJobs = async (input: {
   keywords: string[];
   page?: number;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const apiKey = process.env.THEMUSE_API_KEY;
   if (!apiKey) {
@@ -14,7 +15,7 @@ export const fetchTheMuseJobs = async (input: {
   const page = input.page ?? 1;
   const category = "all";
   const url = `${MUSE_BASE}?page=${page}&api_key=${encodeURIComponent(apiKey)}&category=${category}`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
   if (!res.ok) {
     throw new Error(`The Muse HTTP ${res.status}`);
   }

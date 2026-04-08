@@ -136,4 +136,23 @@ describe("discovery resume context", () => {
     expect(searchContext.locations).toEqual(expect.arrayContaining(["Toronto", "Remote"]));
     expect(searchContext.roleTypes).toEqual(expect.arrayContaining(["intern", "co-op"]));
   });
+
+  it("mentions remote-friendly roles when city filters are paired with non-onsite discovery", () => {
+    const preview = buildResumeContextPreview({
+      profileContext,
+      preferences: {
+        ...defaultDiscoveryPreferencesRow(),
+        remote_preference: "any",
+        resume_context_customized: true,
+        resume_context_overrides: {
+          skills: ["Python", "FastAPI"],
+          locations: ["Toronto"],
+          role_types: ["intern"],
+          note: "",
+        },
+      },
+    });
+
+    expect(preview.summary).toContain("Toronto plus remote-friendly roles");
+  });
 });

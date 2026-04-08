@@ -9,12 +9,38 @@ import { fetchSearchApiJobs } from "./searchapi";
 import { fetchTheMuseJobs } from "./themuse";
 import { fetchUsajobsJobs } from "./usajobs";
 import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
-import type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
+import type {
+  DiscoveryFetchInput,
+  DiscoveryFetchResult,
+  DiscoveryFetchStageCounts,
+  NormalizedJob,
+  RemotePreference,
+  SourceFetchResult,
+} from "./types";
 
-export type { DiscoveryFetchInput, NormalizedJob, RemotePreference, SourceFetchResult } from "./types";
+export type {
+  DiscoveryFetchInput,
+  DiscoveryFetchResult,
+  DiscoveryFetchStageCounts,
+  NormalizedJob,
+  RemotePreference,
+  SourceFetchResult,
+} from "./types";
 
 const GREENHOUSE_MAX_SLUGS = 20;
 const FUZZY_JACCARD_MIN = 0.85;
+const DEFAULT_SOURCE_TIMEOUT_MS = 12_000;
+
+export type SourceQuerySpec = {
+  locations: string[];
+  remoteQuery: boolean;
+};
+
+type SourceExecutionResult = {
+  jobs: NormalizedJob[];
+  error?: string;
+  timedOut?: boolean;
+};
 
 export const normalizeCompanyName = (value: string): string =>
   value
@@ -69,12 +95,17 @@ const normalizeLocationTerm = (loc: string): string =>
  */
 const passesLocationFilter = (
   job: NormalizedJob,
-  userLocations: string[]
+  userLocations: string[],
+  remotePreference: RemotePreference
 ): boolean => {
   if (userLocations.length === 0) return true;
 
   const hasRemote = userLocations.some((l) => /^remote$/i.test(l.trim()));
-  if (hasRemote && job.is_remote) return true;
+  const allowsRemoteOutsideCity =
+    remotePreference === "any" ||
+    remotePreference === "hybrid" ||
+    remotePreference === "remote_only";
+  if (job.is_remote && (hasRemote || allowsRemoteOutsideCity)) return true;
 
   const jobLoc = normalizeLocationTerm(job.location);
   if (!jobLoc) return userLocations.length === 0 || hasRemote;
@@ -137,218 +168,341 @@ export const dedupeNormalizedJobsFuzzy = (jobs: NormalizedJob[]): NormalizedJob[
   return kept;
 };
 
+const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
+  Array.from(
+    new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))
+  );
+
+const isRemoteLocation = (location: string): boolean => /^remote$/i.test(location.trim());
+
+const allowsRemoteExpansion = (remotePreference: RemotePreference): boolean =>
+  remotePreference === "any" ||
+  remotePreference === "hybrid" ||
+  remotePreference === "remote_only";
+
+export const buildLocationAwareQuerySpecs = (input: {
+  locations: string[];
+  remotePreference: RemotePreference;
+}): SourceQuerySpec[] => {
+  const normalizedLocations = uniqueNonEmpty(input.locations);
+  const localLocations = normalizedLocations.filter((location) => !isRemoteLocation(location));
+  const wantsRemoteQuery =
+    allowsRemoteExpansion(input.remotePreference) &&
+    (input.remotePreference === "remote_only" ||
+      localLocations.length > 0 ||
+      normalizedLocations.some(isRemoteLocation));
+
+  const specs: SourceQuerySpec[] = [];
+
+  if (input.remotePreference !== "remote_only" && localLocations.length > 0) {
+    specs.push({ locations: localLocations, remoteQuery: false });
+  }
+
+  if (wantsRemoteQuery) {
+    specs.push({
+      locations: localLocations.length > 0 ? localLocations : normalizedLocations,
+      remoteQuery: true,
+    });
+  }
+
+  if (specs.length === 0) {
+    specs.push({
+      locations: normalizedLocations,
+      remoteQuery: false,
+    });
+  }
+
+  return specs;
+};
+
+const buildSourceQueryLocations = (specs: SourceQuerySpec[]): string[] =>
+  uniqueNonEmpty(
+    specs.flatMap((spec) => (spec.remoteQuery ? [...spec.locations, "Remote"] : spec.locations))
+  );
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof Error &&
+  (error.name === "AbortError" ||
+    /aborted/i.test(error.message) ||
+    /timed out/i.test(error.message));
+
+const formatSourceError = (source: string, error: unknown, timeoutMs: number): string => {
+  if (isAbortError(error)) {
+    return `${source} timed out after ${Math.round(timeoutMs / 1000)}s`;
+  }
+  return error instanceof Error ? error.message : `${source} failed`;
+};
+
+const executeSource = async (
+  source: SourceFetchResult["source"],
+  timeoutMs: number,
+  runner: (signal: AbortSignal) => Promise<SourceExecutionResult>
+): Promise<SourceFetchResult> => {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const result = await runner(controller.signal);
+    return {
+      source,
+      jobs: dedupeNormalizedJobsFuzzy(result.jobs),
+      durationMs: Date.now() - startedAt,
+      timedOut: Boolean(result.timedOut),
+      error: result.error,
+    };
+  } catch (error) {
+    return {
+      source,
+      jobs: [],
+      durationMs: Date.now() - startedAt,
+      timedOut: isAbortError(error),
+      error: formatSourceError(source, error, timeoutMs),
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const runLocationAwareSource = (
+  source: SourceFetchResult["source"],
+  specs: SourceQuerySpec[],
+  timeoutMs: number,
+  fetcher: (input: {
+    locations: string[];
+    remoteQuery: boolean;
+    signal: AbortSignal;
+  }) => Promise<NormalizedJob[]>
+): ((signal: AbortSignal) => Promise<SourceExecutionResult>) => {
+  return async (signal: AbortSignal) => {
+    const settled = await Promise.allSettled(
+      specs.map((spec) =>
+        fetcher({
+          locations: spec.locations,
+          remoteQuery: spec.remoteQuery,
+          signal,
+        })
+      )
+    );
+
+    const jobs: NormalizedJob[] = [];
+    const queryErrors: string[] = [];
+    let timedOut = false;
+
+    settled.forEach((result, index) => {
+      const spec = specs[index]!;
+      const label = spec.remoteQuery
+        ? "remote-friendly query"
+        : spec.locations.slice(0, 2).join(", ") || "location query";
+
+      if (result.status === "fulfilled") {
+        jobs.push(...result.value);
+        return;
+      }
+
+      timedOut = timedOut || isAbortError(result.reason);
+
+      queryErrors.push(
+        `${label}: ${formatSourceError(source, result.reason, timeoutMs)}`
+      );
+    });
+
+    return {
+      jobs,
+      timedOut,
+      error: queryErrors.length > 0 ? queryErrors.join("; ") : undefined,
+    };
+  };
+};
+
+export const filterDiscoveryJobs = (
+  jobs: NormalizedJob[],
+  input: DiscoveryFetchInput
+): { jobs: NormalizedJob[]; stageCounts: DiscoveryFetchStageCounts } => {
+  const fetched = jobs.length;
+  let filtered = jobs.filter((job) => passesRemoteFilter(job, input.remotePreference));
+  const afterRemote = filtered.length;
+  filtered = filtered.filter((job) =>
+    passesLocationFilter(job, input.locations, input.remotePreference)
+  );
+  const afterLocation = filtered.length;
+  filtered = filterJobsByRoleTypeSeniority(filtered, input.roleTypes);
+  filtered = dedupeNormalizedJobsFuzzy(filtered);
+  const afterSeniority = filtered.length;
+
+  return {
+    jobs: filtered,
+    stageCounts: {
+      fetched,
+      afterRemote,
+      afterLocation,
+      afterSeniority,
+    },
+  };
+};
+
 export async function fetchAllDiscoveryJobs(
   input: DiscoveryFetchInput
-): Promise<{ jobs: NormalizedJob[]; sourceErrors: Record<string, string> }> {
+): Promise<DiscoveryFetchResult> {
+  const timeoutMs = Math.max(1_000, input.sourceTimeoutMs ?? DEFAULT_SOURCE_TIMEOUT_MS);
+  const locationQuerySpecs = buildLocationAwareQuerySpecs({
+    locations: input.sourceQueryLocations ?? input.locations,
+    remotePreference: input.remotePreference,
+  });
+  const sourceQueryLocations =
+    input.sourceQueryLocations && input.sourceQueryLocations.length > 0
+      ? uniqueNonEmpty(input.sourceQueryLocations)
+      : buildSourceQueryLocations(locationQuerySpecs);
+
   const tasks: Promise<SourceFetchResult>[] = [
-    (async (): Promise<SourceFetchResult> => {
-      try {
-        const jobs = await fetchAdzunaJobs({
-          keywords: input.keywords,
-          locations: input.locations,
-          roleTypes: input.roleTypes,
-          maxPages: input.adzunaMaxPages ?? 2,
-        });
-        return { source: "adzuna", jobs };
-      } catch (e) {
-        return {
-          source: "adzuna",
-          jobs: [],
-          error: e instanceof Error ? e.message : "Adzuna failed",
-        };
-      }
-    })(),
-(async (): Promise<SourceFetchResult> => {
-      try {
-        const { jobs, errors } = await fetchGreenhouseJobs(input.greenhouseSlugs, GREENHOUSE_MAX_SLUGS);
-        const errMsg =
-          Object.keys(errors).length > 0 ? Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join("; ") : undefined;
-        return { source: "greenhouse", jobs, error: errMsg };
-      } catch (e) {
-        return {
-          source: "greenhouse",
-          jobs: [],
-          error: e instanceof Error ? e.message : "Greenhouse failed",
-        };
-      }
-    })(),
+    executeSource("adzuna", timeoutMs, runLocationAwareSource("adzuna", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+      fetchAdzunaJobs({
+        keywords: input.keywords,
+        locations,
+        roleTypes: input.roleTypes,
+        maxPages: input.adzunaMaxPages ?? 2,
+        remoteQuery,
+        signal,
+      })
+    )),
+    executeSource("greenhouse", timeoutMs, async (signal) => {
+      const { jobs, errors } = await fetchGreenhouseJobs(
+        input.greenhouseSlugs,
+        GREENHOUSE_MAX_SLUGS,
+        signal
+      );
+      return {
+        jobs,
+        error:
+          Object.keys(errors).length > 0
+            ? Object.entries(errors)
+                .map(([slug, message]) => `${slug}: ${message}`)
+                .join("; ")
+            : undefined,
+      };
+    }),
+    executeSource("himalayas", timeoutMs, async (signal) => ({
+      jobs: await fetchHimalayasJobs({
+        keywords: input.keywords,
+        roleTypes: input.roleTypes,
+        signal,
+      }),
+    })),
+    executeSource("jobicy", timeoutMs, async (signal) => ({
+      jobs: await fetchJobicyJobs({
+        keywords: input.keywords,
+        roleTypes: input.roleTypes,
+        signal,
+      }),
+    })),
+    executeSource("remoteok", timeoutMs, async (signal) => ({
+      jobs: await fetchRemoteOKJobs({
+        keywords: input.keywords,
+        roleTypes: input.roleTypes,
+        signal,
+      }),
+    })),
   ];
-
-  tasks.push(
-    (async (): Promise<SourceFetchResult> => {
-      try {
-        const jobs = await fetchHimalayasJobs({
-          keywords: input.keywords,
-          roleTypes: input.roleTypes,
-        });
-        return { source: "himalayas", jobs };
-      } catch (e) {
-        return {
-          source: "himalayas",
-          jobs: [],
-          error: e instanceof Error ? e.message : "Himalayas failed",
-        };
-      }
-    })()
-  );
-
-  tasks.push(
-    (async (): Promise<SourceFetchResult> => {
-      try {
-        const jobs = await fetchJobicyJobs({
-          keywords: input.keywords,
-          roleTypes: input.roleTypes,
-        });
-        return { source: "jobicy", jobs };
-      } catch (e) {
-        return {
-          source: "jobicy",
-          jobs: [],
-          error: e instanceof Error ? e.message : "Jobicy failed",
-        };
-      }
-    })()
-  );
-
-  tasks.push(
-    (async (): Promise<SourceFetchResult> => {
-      try {
-        const jobs = await fetchRemoteOKJobs({
-          keywords: input.keywords,
-          roleTypes: input.roleTypes,
-        });
-        return { source: "remoteok", jobs };
-      } catch (e) {
-        return {
-          source: "remoteok",
-          jobs: [],
-          error: e instanceof Error ? e.message : "RemoteOK failed",
-        };
-      }
-    })()
-  );
 
   if (process.env.THEMUSE_API_KEY?.trim()) {
     tasks.push(
-      (async (): Promise<SourceFetchResult> => {
-        try {
-          const jobs = await fetchTheMuseJobs({ keywords: input.keywords, page: 1 });
-          return { source: "themuse", jobs };
-        } catch (e) {
-          return {
-            source: "themuse",
-            jobs: [],
-            error: e instanceof Error ? e.message : "The Muse failed",
-          };
-        }
-      })()
+      executeSource("themuse", timeoutMs, async (signal) => ({
+        jobs: await fetchTheMuseJobs({ keywords: input.keywords, page: 1, signal }),
+      }))
     );
   }
 
   if (process.env.JSEARCH_API_KEY?.trim()) {
     tasks.push(
-      (async (): Promise<SourceFetchResult> => {
-        try {
-          const jobs = await fetchJSearchJobs({
+      executeSource(
+        "jsearch",
+        timeoutMs,
+        runLocationAwareSource("jsearch", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchJSearchJobs({
             keywords: input.keywords,
-            locations: input.locations,
+            locations,
             roleTypes: input.roleTypes,
-          });
-          return { source: "jsearch", jobs };
-        } catch (e) {
-          return {
-            source: "jsearch",
-            jobs: [],
-            error: e instanceof Error ? e.message : "JSearch failed",
-          };
-        }
-      })()
+            remoteQuery,
+            signal,
+          })
+        )
+      )
     );
   }
 
   if (process.env.JOOBLE_API_KEY?.trim()) {
     tasks.push(
-      (async (): Promise<SourceFetchResult> => {
-        try {
-          const jobs = await fetchJoobleJobs({
+      executeSource(
+        "jooble",
+        timeoutMs,
+        runLocationAwareSource("jooble", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchJoobleJobs({
             keywords: input.keywords,
-            locations: input.locations,
+            locations,
             roleTypes: input.roleTypes,
-          });
-          return { source: "jooble", jobs };
-        } catch (e) {
-          return {
-            source: "jooble",
-            jobs: [],
-            error: e instanceof Error ? e.message : "Jooble failed",
-          };
-        }
-      })()
+            remoteQuery,
+            signal,
+          })
+        )
+      )
     );
   }
 
   if (process.env.USAJOBS_API_KEY?.trim()) {
     tasks.push(
-      (async (): Promise<SourceFetchResult> => {
-        try {
-          const jobs = await fetchUsajobsJobs({
+      executeSource(
+        "usajobs",
+        timeoutMs,
+        runLocationAwareSource("usajobs", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchUsajobsJobs({
             keywords: input.keywords,
-            locations: input.locations,
+            locations,
             roleTypes: input.roleTypes,
-          });
-          return { source: "usajobs", jobs };
-        } catch (e) {
-          return {
-            source: "usajobs",
-            jobs: [],
-            error: e instanceof Error ? e.message : "USAJOBS failed",
-          };
-        }
-      })()
+            remoteQuery,
+            signal,
+          })
+        )
+      )
     );
   }
 
   if (process.env.SEARCHAPI_API_KEY?.trim()) {
     tasks.push(
-      (async (): Promise<SourceFetchResult> => {
-        try {
-          const jobs = await fetchSearchApiJobs({
+      executeSource(
+        "searchapi",
+        timeoutMs,
+        runLocationAwareSource("searchapi", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchSearchApiJobs({
             keywords: input.keywords,
-            locations: input.locations,
+            locations,
             roleTypes: input.roleTypes,
-          });
-          return { source: "searchapi", jobs };
-        } catch (e) {
-          return {
-            source: "searchapi",
-            jobs: [],
-            error: e instanceof Error ? e.message : "SearchApi failed",
-          };
-        }
-      })()
+            remoteQuery,
+            signal,
+          })
+        )
+      )
     );
   }
 
-  const settled = await Promise.allSettled(tasks);
+  const results = await Promise.all(tasks);
 
   const sourceErrors: Record<string, string> = {};
+  const sourceStats: Record<string, DiscoveryFetchResult["sourceStats"][string]> = {};
   const combined: NormalizedJob[] = [];
 
-  for (const s of settled) {
-    if (s.status === "fulfilled") {
-      const r = s.value;
-      if (r.error) sourceErrors[r.source] = r.error;
-      combined.push(...r.jobs);
-    } else {
-      sourceErrors.unknown = s.reason instanceof Error ? s.reason.message : "Unknown source error";
-    }
+  for (const result of results) {
+    if (result.error) sourceErrors[result.source] = result.error;
+    sourceStats[result.source] = {
+      count: result.jobs.length,
+      durationMs: result.durationMs,
+      timedOut: result.timedOut,
+      error: result.error ?? null,
+    };
+    combined.push(...result.jobs);
   }
 
-  let filtered = combined.filter((j) => passesRemoteFilter(j, input.remotePreference));
-  filtered = filtered.filter((j) => passesLocationFilter(j, input.locations));
-  filtered = filtered.filter((j) => passesExcluded(j, input.excludedCompanies));
-  filtered = filterJobsByRoleTypeSeniority(filtered, input.roleTypes);
-  filtered = dedupeNormalizedJobsFuzzy(filtered);
+  const included = combined.filter((job) => passesExcluded(job, input.excludedCompanies));
+  const { jobs, stageCounts } = filterDiscoveryJobs(included, input);
 
-  return { jobs: filtered, sourceErrors };
+  return { jobs, sourceErrors, sourceStats, sourceQueryLocations, stageCounts };
 }

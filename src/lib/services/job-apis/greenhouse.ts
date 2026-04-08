@@ -1,10 +1,32 @@
 import type { NormalizedJob } from "./types";
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const abortError = () => new DOMException("The operation was aborted.", "AbortError");
 
-export const fetchGreenhouseJobsForSlug = async (slug: string): Promise<NormalizedJob[]> => {
+const sleep = async (ms: number, signal?: AbortSignal) => {
+  if (signal?.aborted) throw abortError();
+  await new Promise<void>((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      resolve();
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(abortError());
+    };
+    const cleanup = () => {
+      signal?.removeEventListener("abort", onAbort);
+    };
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+};
+
+export const fetchGreenhouseJobsForSlug = async (
+  slug: string,
+  signal?: AbortSignal
+): Promise<NormalizedJob[]> => {
   const url = `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(slug)}/jobs`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url, { next: { revalidate: 0 }, signal });
   if (!res.ok) {
     throw new Error(`Greenhouse ${slug}: HTTP ${res.status}`);
   }
@@ -46,7 +68,8 @@ export const fetchGreenhouseJobsForSlug = async (slug: string): Promise<Normaliz
 
 export const fetchGreenhouseJobs = async (
   slugs: string[],
-  maxSlugs: number
+  maxSlugs: number,
+  signal?: AbortSignal
 ): Promise<{ jobs: NormalizedJob[]; errors: Record<string, string> }> => {
   const trimmed = slugs.map((s) => s.trim().toLowerCase()).filter(Boolean);
   const slice = trimmed.slice(0, maxSlugs);
@@ -54,14 +77,16 @@ export const fetchGreenhouseJobs = async (
   const errors: Record<string, string> = {};
 
   for (let i = 0; i < slice.length; i += 1) {
+    if (signal?.aborted) throw abortError();
     const slug = slice[i]!;
     try {
-      const batch = await fetchGreenhouseJobsForSlug(slug);
+      const batch = await fetchGreenhouseJobsForSlug(slug, signal);
       jobs.push(...batch);
     } catch (e) {
+      if (signal?.aborted) throw e;
       errors[slug] = e instanceof Error ? e.message : "Unknown error";
     }
-    if (i < slice.length - 1) await sleep(150);
+    if (i < slice.length - 1) await sleep(150, signal);
   }
 
   return { jobs, errors };

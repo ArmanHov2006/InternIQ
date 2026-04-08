@@ -13,6 +13,8 @@ export const fetchUsajobsJobs = async (input: {
   keywords: string[];
   locations: string[];
   roleTypes: string[];
+  remoteQuery?: boolean;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const apiKey = process.env.USAJOBS_API_KEY;
   const email = process.env.USAJOBS_EMAIL;
@@ -21,13 +23,15 @@ export const fetchUsajobsJobs = async (input: {
   }
 
   const params = new URLSearchParams({
-    Keyword: input.keywords.slice(0, 3).join(" ") || "intern OR student",
+    Keyword: [input.keywords.slice(0, 3).join(" "), input.remoteQuery ? "remote" : ""]
+      .filter(Boolean)
+      .join(" ") || "intern OR student",
     ResultsPerPage: "50",
     Page: "1",
     WhoMayApply: "public",
   });
 
-  if (input.locations[0]) {
+  if (!input.remoteQuery && input.locations[0]) {
     params.set("LocationName", input.locations[0]);
   }
 
@@ -43,6 +47,7 @@ export const fetchUsajobsJobs = async (input: {
       Host: "data.usajobs.gov",
     },
     next: { revalidate: 0 },
+    signal: input.signal,
   });
 
   if (!res.ok) {

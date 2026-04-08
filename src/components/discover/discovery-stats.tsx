@@ -1,8 +1,10 @@
 "use client";
 
-import { Briefcase, Inbox, PlusCircle, TrendingUp } from "lucide-react";
+import { Briefcase, CheckCircle2, ScanSearch, TrendingUp } from "lucide-react";
 import { GlassCard } from "@/components/ui/glass-card";
 import { cn } from "@/lib/utils";
+import { getDiscoveryPrimaryScore, parseStoredAi } from "@/lib/services/discovery/ai-scorer";
+import { useDiscoverStore } from "@/stores/discover-store";
 import type { Opportunity } from "@/types/database";
 
 interface DiscoveryStatsProps {
@@ -39,37 +41,42 @@ const StatCard = ({
 );
 
 export const DiscoveryStats = ({ opportunities }: DiscoveryStatsProps) => {
-  const total = opportunities.length;
-  const newCount = opportunities.filter((o) => o.status === "new").length;
-  const savedCount = opportunities.filter((o) => o.application_id).length;
+  const latestRunSummary = useDiscoverStore((state) => state.latestRunSummary);
+  const activeShortlist = opportunities.filter((opportunity) => opportunity.status === "new");
+  const total = activeShortlist.length;
+  const applyReadyCount = activeShortlist.filter((opportunity) => {
+    const ai = parseStoredAi(opportunity);
+    return ai ? ai.verdict === "strong_apply" || ai.verdict === "apply" : false;
+  }).length;
+  const reviewedCount = latestRunSummary?.reviewedCount ?? 0;
   const avgScore =
     total > 0
       ? Math.round(
-          opportunities.reduce((sum, o) => sum + (o.match_score ?? 0), 0) / total
+          activeShortlist.reduce((sum, opportunity) => sum + (getDiscoveryPrimaryScore(opportunity) ?? 0), 0) / total
         )
       : 0;
 
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
-        label="Total discovered"
+        label="Active shortlist"
         value={String(total)}
         icon={Briefcase}
       />
       <StatCard
-        label="New matches"
-        value={String(newCount)}
-        icon={Inbox}
-        accent="bg-blue-500/10 text-blue-400"
+        label="Apply-ready"
+        value={String(applyReadyCount)}
+        icon={CheckCircle2}
+        accent="bg-teal-500/10 text-teal-400"
       />
       <StatCard
-        label="Saved to pipeline"
-        value={String(savedCount)}
-        icon={PlusCircle}
+        label="Reviewed last run"
+        value={reviewedCount > 0 ? String(reviewedCount) : "--"}
+        icon={ScanSearch}
         accent="bg-emerald-500/10 text-emerald-400"
       />
       <StatCard
-        label="Avg match score"
+        label="Avg shortlist score"
         value={avgScore > 0 ? `${avgScore}%` : "--"}
         icon={TrendingUp}
         accent="bg-amber-500/10 text-amber-400"

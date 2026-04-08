@@ -11,19 +11,20 @@ const inferCountry = (locations: string[]): string => {
   return "us";
 };
 
-const buildWhat = (keywords: string[], roleTypes: string[]): string => {
+const buildWhat = (keywords: string[], roleTypes: string[], remoteQuery = false): string => {
   const skills = keywords.map((s) => s.trim()).filter(Boolean);
   const roles = roleTypes.map((s) => s.trim()).filter(Boolean);
+  const qualifiers = remoteQuery ? ["remote"] : [];
 
   // OR-join top 3 skills for broader matching instead of AND-joining all
   const skillPart = skills.slice(0, 3).join(" OR ");
   // Always include role types so entry-level filtering reaches the API
-  const rolePart = roles.length > 0 ? roles.slice(0, 2).join(" OR ") : "";
+  const rolePart = [...roles.slice(0, 2), ...qualifiers].join(" OR ");
 
   if (skillPart && rolePart) return `(${skillPart}) AND (${rolePart})`;
   if (skillPart) return skillPart;
   if (rolePart) return rolePart;
-  return "intern OR entry level OR junior";
+  return remoteQuery ? "remote AND (intern OR entry level OR junior)" : "intern OR entry level OR junior";
 };
 
 export const buildWhatExclude = (roleTypes: string[]): string =>
@@ -36,6 +37,8 @@ export const fetchAdzunaJobs = async (input: {
   locations: string[];
   roleTypes: string[];
   maxPages: number;
+  remoteQuery?: boolean;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const appId = process.env.ADZUNA_APP_ID;
   const appKey = process.env.ADZUNA_APP_KEY;
@@ -44,10 +47,10 @@ export const fetchAdzunaJobs = async (input: {
   }
 
   const country = inferCountry(input.locations);
-  const what = encodeURIComponent(buildWhat(input.keywords, input.roleTypes));
+  const what = encodeURIComponent(buildWhat(input.keywords, input.roleTypes, input.remoteQuery));
   const whatExclude = buildWhatExclude(input.roleTypes);
   const locationParam =
-    input.locations.length > 0
+    !input.remoteQuery && input.locations.length > 0
       ? `&where=${encodeURIComponent(input.locations.slice(0, 3).join(" "))}`
       : "";
   const excludeParam = whatExclude ? `&what_exclude=${encodeURIComponent(whatExclude)}` : "";
@@ -57,7 +60,7 @@ export const fetchAdzunaJobs = async (input: {
 
   for (let page = 1; page <= pages; page += 1) {
     const url = `${ADZUNA_BASE}/${country}/search/${page}?app_id=${encodeURIComponent(appId)}&app_key=${encodeURIComponent(appKey)}&results_per_page=25&what=${what}${locationParam}${excludeParam}`;
-    const res = await fetch(url, { next: { revalidate: 0 } });
+    const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
     if (!res.ok) {
       throw new Error(`Adzuna HTTP ${res.status}`);
     }

@@ -215,12 +215,19 @@ const buildPreviewSummary = (input: {
   effectiveSkills: string[];
   effectiveLocations: string[];
   effectiveRoleTypes: string[];
+  remotePreference: RemotePreference;
   note: string;
   hasAdvancedFilters: boolean;
 }): string => {
   const skillsText = formatList(input.effectiveSkills, "broad discovery terms");
+  const mentionsRemoteFriendlyRoles =
+    input.effectiveLocations.length > 0 &&
+    input.remotePreference !== "onsite" &&
+    !input.effectiveLocations.some((location) => /^remote$/i.test(location.trim()));
   const locationText = input.effectiveLocations.length
-    ? ` around ${formatList(input.effectiveLocations, "your preferred locations")}`
+    ? mentionsRemoteFriendlyRoles
+      ? ` around ${formatList(input.effectiveLocations, "your preferred locations")} plus remote-friendly roles`
+      : ` around ${formatList(input.effectiveLocations, "your preferred locations")}`
     : "";
   const roleText = input.effectiveRoleTypes.length
     ? ` for ${formatList(input.effectiveRoleTypes, "your preferred roles")} roles`
@@ -290,6 +297,7 @@ export const buildResumeContextPreview = (input: {
       effectiveSkills,
       effectiveLocations,
       effectiveRoleTypes,
+      remotePreference: normalizeRemotePreference(prefs.remote_preference),
       note: overrides.note,
       hasAdvancedFilters,
     }),

@@ -6,7 +6,6 @@ import { toast } from "sonner";
 import { useDiscoverStore, selectFilteredOpportunities } from "@/stores/discover-store";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { JobCard } from "./job-card";
 import {
@@ -19,17 +18,18 @@ import {
 } from "@/components/ui/dialog";
 import { useKanbanStore } from "@/stores/kanban-store";
 import type { Application, Opportunity } from "@/types/database";
+import { getDiscoverEmptyState } from "@/lib/services/discovery/run-feedback";
 
 export const JobFeed = () => {
   const opportunities = useDiscoverStore((s) => s.opportunities);
   const loading = useDiscoverStore((s) => s.loading);
+  const preferences = useDiscoverStore((s) => s.preferences);
   const sort = useDiscoverStore((s) => s.sort);
-  const filter = useDiscoverStore((s) => s.filter);
   const setSort = useDiscoverStore((s) => s.setSort);
-  const setFilter = useDiscoverStore((s) => s.setFilter);
   const scoring = useDiscoverStore((s) => s.scoring);
   const setScoring = useDiscoverStore((s) => s.setScoring);
   const fetchOpportunities = useDiscoverStore((s) => s.fetchOpportunities);
+  const latestRunSummary = useDiscoverStore((s) => s.latestRunSummary);
   const selectedIds = useDiscoverStore((s) => s.selectedIds);
   const clearSelection = useDiscoverStore((s) => s.clearSelection);
   const updateOpportunity = useDiscoverStore((s) => s.updateOpportunity);
@@ -38,7 +38,11 @@ export const JobFeed = () => {
   const [batchOpen, setBatchOpen] = useState(false);
   const [batchRunning, setBatchRunning] = useState(false);
 
-  const rows = selectFilteredOpportunities(opportunities, filter, sort);
+  const rows = selectFilteredOpportunities(opportunities, "new", sort);
+  const emptyState = getDiscoverEmptyState({
+    latestRunSummary,
+    minMatchScore: preferences?.min_match_score ?? 55,
+  });
 
   const onAiScore = async () => {
     setScoring(true);
@@ -47,11 +51,17 @@ export const JobFeed = () => {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ runId: latestRunSummary?.runId }),
       });
-      const payload = (await res.json()) as { error?: string; scored?: number };
+      const payload = (await res.json()) as {
+        error?: string;
+        scored?: number;
+        candidates?: number;
+      };
       if (!res.ok) throw new Error(payload.error ?? "Scoring failed");
-      toast.success(`AI scored ${payload.scored ?? 0} job(s).`);
+      toast.success(
+        `Re-scored ${payload.scored ?? 0} of ${payload.candidates ?? payload.scored ?? 0} shortlist job(s).`
+      );
       await fetchOpportunities();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Scoring failed.");
@@ -105,32 +115,10 @@ export const JobFeed = () => {
     <div className="space-y-4">
       {/* Controls bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <Tabs
-          value={filter}
-          onValueChange={(v) => setFilter(v as typeof filter)}
-          className="w-full sm:w-auto"
-        >
-          <TabsList className="h-8">
-            <TabsTrigger value="all" className="text-xs">
-              All{" "}
-              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
-                {opportunities.length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="new" className="text-xs">
-              New{" "}
-              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
-                {opportunities.filter((o) => o.status === "new").length}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger value="saved" className="text-xs">
-              Saved{" "}
-              <span className="ml-1 font-mono text-[10px] text-muted-foreground">
-                {opportunities.filter((o) => o.status === "saved").length}
-              </span>
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <div className="text-xs text-muted-foreground">
+          Current shortlist{" "}
+          <span className="ml-1 font-mono text-[11px] text-foreground">{rows.length}</span>
+        </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
           <Button
@@ -159,11 +147,11 @@ export const JobFeed = () => {
             variant="outline"
             size="sm"
             className="h-7 text-[11px]"
-            disabled={scoring}
+            disabled={scoring || rows.length === 0}
             onClick={onAiScore}
           >
             <Sparkles className="mr-1 h-3 w-3" aria-hidden />
-            AI Score
+            Re-score shortlist
           </Button>
           <Button
             type="button"
@@ -190,8 +178,8 @@ export const JobFeed = () => {
       ) : rows.length === 0 ? (
         <EmptyState
           icon={<Compass className="h-6 w-6" aria-hidden />}
-          title="No discovered jobs yet"
-          description="Run Discovery to scan multiple job sources, or adjust your search context to cast a wider net."
+          title={emptyState.title}
+          description={emptyState.description}
         />
       ) : (
         <div className="grid gap-3 md:grid-cols-2">

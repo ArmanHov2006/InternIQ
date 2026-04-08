@@ -6,8 +6,10 @@ import type {
   MatchInsight,
   Profile,
   Project,
+  RemotePreference,
   Resume,
 } from "@/types/database";
+import type { DiscoveryGatingFlag } from "@/lib/services/discovery/ai-scorer";
 
 const STOP_WORDS = new Set([
   "a",
@@ -85,6 +87,32 @@ const JOB_NOISE_WORDS = new Set([
   "ensure",
 ]);
 
+const KNOWN_SKILL_PATTERNS: Array<{ label: string; pattern: RegExp }> = [
+  { label: "python", pattern: /\bpython\b/i },
+  { label: "fastapi", pattern: /\bfastapi\b/i },
+  { label: "django", pattern: /\bdjango\b/i },
+  { label: "typescript", pattern: /\btypescript\b/i },
+  { label: "javascript", pattern: /\bjavascript\b/i },
+  { label: "react", pattern: /\breact\b/i },
+  { label: "node", pattern: /\bnode(?:\.js)?\b/i },
+  { label: "redis", pattern: /\bredis\b/i },
+  { label: "docker", pattern: /\bdocker\b/i },
+  { label: "kubernetes", pattern: /\bkubernetes\b|\bk8s\b/i },
+  { label: "postgresql", pattern: /\bpostgres(?:ql)?\b/i },
+  { label: "sql", pattern: /\bsql\b/i },
+  { label: "aws", pattern: /\baws\b|amazon web services/i },
+  { label: "gcp", pattern: /\bgcp\b|google cloud/i },
+  { label: "azure", pattern: /\bazure\b/i },
+  { label: "graphql", pattern: /\bgraphql\b/i },
+  { label: "java", pattern: /\bjava\b/i },
+  { label: "c++", pattern: /\bc\+\+\b/i },
+  { label: "go", pattern: /\bgolang\b|\bgo\b/i },
+  { label: "llm", pattern: /\bllm\b|large language model/i },
+  { label: "rag", pattern: /\brag\b|retrieval-augmented generation/i },
+  { label: "machine learning", pattern: /\bmachine learning\b|\bml\b/i },
+  { label: "analytics", pattern: /\banalytics\b|\bexperimentation\b/i },
+];
+
 const normalizeToken = (value: string): string =>
   value.trim().toLowerCase().replace(/[^a-z0-9+#.\-]/g, "");
 
@@ -125,6 +153,13 @@ type SenioritySignal = {
   band: SeniorityBand;
   delta: number;
   note: string;
+  gatingFlags: DiscoveryGatingFlag[];
+};
+
+type HeuristicSignal = {
+  delta: number;
+  note: string;
+  gatingFlags: DiscoveryGatingFlag[];
 };
 
 export const hasEntryLevelRoleTypes = (roleTypes?: string[]): boolean =>
@@ -150,7 +185,7 @@ export const detectSenioritySignal = (
   roleTypes?: string[]
 ): SenioritySignal => {
   if (!hasEntryLevelRoleTypes(roleTypes)) {
-    return { band: "neutral", delta: 0, note: "" };
+    return { band: "neutral", delta: 0, note: "", gatingFlags: [] };
   }
 
   const band = classifyJobTitleSeniority(jobTitle);
@@ -159,20 +194,23 @@ export const detectSenioritySignal = (
       band,
       delta: 10,
       note: "Title matches your entry-level search.",
+      gatingFlags: [],
     };
   }
   if (band === "executive") {
     return {
       band,
-      delta: -30,
+      delta: -34,
       note: "Title signals a principal or director-level role for an entry-level search.",
+      gatingFlags: ["seniority_mismatch"],
     };
   }
   if (band === "senior") {
     return {
       band,
-      delta: -20,
+      delta: -22,
       note: "Title signals a senior-level role for an entry-level search.",
+      gatingFlags: ["seniority_mismatch"],
     };
   }
 
@@ -180,6 +218,7 @@ export const detectSenioritySignal = (
     band,
     delta: 0,
     note: "Title has no clear entry-level signal.",
+    gatingFlags: [],
   };
 };
 
@@ -226,6 +265,183 @@ const uniqueTopTokens = (value: string, limit = 10): string[] => {
     .map(([token]) => token);
 };
 
+const extractKnownSkills = (value: string): string[] =>
+  uniqueNonEmpty(
+    KNOWN_SKILL_PATTERNS.filter((candidate) => candidate.pattern.test(value)).map(
+      (candidate) => candidate.label
+    )
+  );
+
+const extractYearsRequirement = (value: string): number | null => {
+  const regex = /(\d+)(?:\s*(?:-|to)\s*(\d+))?\+?\s+years?/gi;
+  let highest: number | null = null;
+  let match: RegExpExecArray | null;
+  while ((match = regex.exec(value)) !== null) {
+    const first = Number(match[1] ?? 0);
+    const second = Number(match[2] ?? 0);
+    const candidate = Math.max(first, second || 0);
+    if (!Number.isFinite(candidate) || candidate <= 0) continue;
+    highest = highest == null ? candidate : Math.max(highest, candidate);
+  }
+  return highest;
+};
+
+const normalizeLocationText = (value: string): string =>
+  value.trim().toLowerCase().replace(/[^a-z0-9]+/g, " ").replace(/\s+/g, " ").trim();
+
+const detectYearsSignal = (jobDescription: string, roleTypes?: string[]): HeuristicSignal => {
+  if (!hasEntryLevelRoleTypes(roleTypes)) {
+    return { delta: 0, note: "", gatingFlags: [] };
+  }
+
+  const yearsRequired = extractYearsRequirement(jobDescription);
+  if (yearsRequired == null) {
+    return { delta: 0, note: "", gatingFlags: [] };
+  }
+  if (yearsRequired >= 5) {
+    return {
+      delta: -28,
+      note: `Posting asks for ${yearsRequired}+ years of experience, which is a tough fit for an entry-level search.`,
+      gatingFlags: ["years_mismatch"],
+    };
+  }
+  if (yearsRequired >= 3) {
+    return {
+      delta: -16,
+      note: `Posting asks for ${yearsRequired}+ years of experience, so this is more of a stretch for entry-level roles.`,
+      gatingFlags: ["years_mismatch"],
+    };
+  }
+  if (yearsRequired >= 2) {
+    return {
+      delta: -6,
+      note: `Posting asks for ${yearsRequired}+ years of experience, so this may be a stretch for early-career roles.`,
+      gatingFlags: [],
+    };
+  }
+  if (yearsRequired <= 1) {
+    return {
+      delta: 4,
+      note: "Experience requirement still looks entry-level friendly.",
+      gatingFlags: [],
+    };
+  }
+  return { delta: 0, note: "", gatingFlags: [] };
+};
+
+const detectLocationSignal = (input: {
+  jobDescription: string;
+  jobLocation?: string;
+  preferredLocations?: string[];
+  remotePreference?: RemotePreference;
+}): HeuristicSignal => {
+  const combinedLocationText = [input.jobLocation, input.jobDescription].filter(Boolean).join(" ");
+  const normalizedCombined = normalizeLocationText(combinedLocationText);
+  const normalizedPreferred = (input.preferredLocations ?? [])
+    .map(normalizeLocationText)
+    .filter(Boolean);
+  const isRemote = /\bremote\b/i.test(combinedLocationText);
+  const isHybrid = /\bhybrid\b/i.test(combinedLocationText);
+  const isOnsite = /\bon[\s-]?site\b/i.test(combinedLocationText);
+
+  let delta = 0;
+  const notes: string[] = [];
+  const gatingFlags: DiscoveryGatingFlag[] = [];
+
+  if (input.remotePreference === "remote_only" && !isRemote) {
+    delta -= 18;
+    notes.push("Role is not clearly remote.");
+    gatingFlags.push("remote_mismatch");
+  } else if (input.remotePreference === "hybrid" && !(isRemote || isHybrid)) {
+    delta -= 10;
+    notes.push("Role does not read as remote or hybrid.");
+    gatingFlags.push("location_mismatch");
+  } else if (input.remotePreference === "onsite" && isRemote && !isOnsite) {
+    delta -= 8;
+    notes.push("Role looks primarily remote.");
+    gatingFlags.push("remote_mismatch");
+  } else if (input.remotePreference === "remote_only" && isRemote) {
+    delta += 5;
+  }
+
+  if (normalizedPreferred.length > 0 && !isRemote) {
+    const matchesPreferred = normalizedPreferred.some((location) => {
+      return normalizedCombined.includes(location) || location.includes(normalizedCombined);
+    });
+    if (!matchesPreferred) {
+      delta -= 10;
+      notes.push("Location does not match your saved discovery locations.");
+      gatingFlags.push("location_mismatch");
+    } else {
+      delta += 4;
+    }
+  }
+
+  return {
+    delta,
+    note: notes.join(" "),
+    gatingFlags: Array.from(new Set(gatingFlags)),
+  };
+};
+
+const detectMustHaveSignal = (input: {
+  jobDescription: string;
+  comparisonCorpus: string;
+}): {
+  matchedSkills: string[];
+  missingSkills: string[];
+  signal: HeuristicSignal;
+} => {
+  const knownJobSkills = extractKnownSkills(input.jobDescription);
+  if (knownJobSkills.length === 0) {
+    return {
+      matchedSkills: [],
+      missingSkills: [],
+      signal: { delta: 0, note: "", gatingFlags: [] },
+    };
+  }
+
+  const matchedSkills = knownJobSkills.filter((skill) => input.comparisonCorpus.includes(skill));
+  const missingSkills = knownJobSkills.filter((skill) => !input.comparisonCorpus.includes(skill));
+  const missingRatio = missingSkills.length / knownJobSkills.length;
+
+  if (missingSkills.length === 0) {
+    return {
+      matchedSkills,
+      missingSkills,
+      signal: {
+        delta: Math.min(8, matchedSkills.length * 2),
+        note: "Core tools line up well with your background.",
+        gatingFlags: [],
+      },
+    };
+  }
+  let delta = 0;
+  if (matchedSkills.length >= 2 && missingRatio <= 0.4) {
+    delta = 2;
+  } else if (matchedSkills.length >= 1 && missingRatio < 0.6) {
+    delta = -2;
+  } else if (matchedSkills.length >= 1) {
+    delta = -6;
+  } else {
+    delta = -10;
+  }
+  const gatingFlags =
+    missingRatio >= 0.75 || matchedSkills.length === 0
+      ? (["missing_must_have"] as DiscoveryGatingFlag[])
+      : [];
+
+  return {
+    matchedSkills,
+    missingSkills,
+    signal: {
+      delta,
+      note: `Potential must-have gaps: ${missingSkills.slice(0, 3).join(", ")}.`,
+      gatingFlags,
+    },
+  };
+};
+
 export const computeMatchInsight = (input: {
   jobDescription: string;
   resumeText?: string;
@@ -233,6 +449,9 @@ export const computeMatchInsight = (input: {
   profileKeywords?: string[];
   jobTitle?: string;
   roleTypes?: string[];
+  jobLocation?: string;
+  preferredLocations?: string[];
+  remotePreference?: RemotePreference;
 }): MatchInsight => {
   const jobKeywords = uniqueTopTokens(input.jobDescription, 12);
   const jobText = input.jobDescription.toLowerCase();
@@ -249,16 +468,48 @@ export const computeMatchInsight = (input: {
   ]
     .join(" ")
     .toLowerCase();
+  const mustHave = detectMustHaveSignal({
+    jobDescription: input.jobDescription,
+    comparisonCorpus,
+  });
   const matched = uniqueNonEmpty([
     ...jobKeywords.filter((keyword) => comparisonCorpus.includes(keyword)),
     ...explicitProfileHits,
+    ...mustHave.matchedSkills,
   ]);
-  const missing = jobKeywords.filter((keyword) => !comparisonCorpus.includes(keyword));
-  const weightedSignals = uniqueNonEmpty([...jobKeywords, ...explicitProfileHits]);
+  const missing = uniqueNonEmpty([
+    ...jobKeywords.filter((keyword) => !comparisonCorpus.includes(keyword)),
+    ...mustHave.missingSkills,
+  ]);
+  const weightedSignals = uniqueNonEmpty([
+    ...jobKeywords,
+    ...explicitProfileHits,
+    ...mustHave.matchedSkills,
+    ...mustHave.missingSkills,
+  ]);
   const ratio = weightedSignals.length === 0 ? 0 : matched.length / weightedSignals.length;
-  const scoreBoost = Math.min(15, explicitProfileHits.length * 3);
+  const explicitBoost = Math.min(12, explicitProfileHits.length * 3);
   const seniority = detectSenioritySignal(input.jobTitle, input.roleTypes);
-  const score = clamp(Math.round(40 + ratio * 50 + scoreBoost + seniority.delta), 15, 98);
+  const years = detectYearsSignal(input.jobDescription, input.roleTypes);
+  const location = detectLocationSignal({
+    jobDescription: input.jobDescription,
+    jobLocation: input.jobLocation,
+    preferredLocations: input.preferredLocations,
+    remotePreference: input.remotePreference,
+  });
+  const score = clamp(
+    Math.round(
+      34 +
+        ratio * 46 +
+        explicitBoost +
+        mustHave.signal.delta +
+        seniority.delta +
+        years.delta +
+        location.delta
+    ),
+    20,
+    84
+  );
 
   const matchedSummary = matched.length
     ? `Fast match found overlap on ${matched.slice(0, 4).join(", ")}`
@@ -270,12 +521,27 @@ export const computeMatchInsight = (input: {
   if (seniority.note) {
     summaryParts.push(seniority.note);
   }
+  if (years.note) {
+    summaryParts.push(years.note);
+  }
+  if (location.note) {
+    summaryParts.push(location.note);
+  }
+  if (mustHave.signal.note) {
+    summaryParts.push(mustHave.signal.note);
+  }
 
   return {
     score,
     summary: `${summaryParts.join(". ")}.`,
     matched_keywords: matched,
     missing_keywords: missing,
+    gating_flags: uniqueNonEmpty([
+      ...seniority.gatingFlags,
+      ...years.gatingFlags,
+      ...location.gatingFlags,
+      ...mustHave.signal.gatingFlags,
+    ]),
   };
 };
 

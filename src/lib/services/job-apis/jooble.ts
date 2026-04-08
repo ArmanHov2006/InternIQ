@@ -13,6 +13,8 @@ export const fetchJoobleJobs = async (input: {
   keywords: string[];
   locations: string[];
   roleTypes: string[];
+  remoteQuery?: boolean;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const apiKey = process.env.JOOBLE_API_KEY;
   if (!apiKey) {
@@ -26,8 +28,11 @@ export const fetchJoobleJobs = async (input: {
   if (input.keywords.length > 0) {
     keywordParts.push(input.keywords.slice(0, 3).join(" "));
   }
+  if (input.remoteQuery) {
+    keywordParts.push("remote");
+  }
 
-  const location = input.locations[0] ?? "";
+  const location = input.remoteQuery ? "" : input.locations[0] ?? "";
   const res = await fetch(`${JOOBLE_BASE}/${apiKey}`, {
     method: "POST",
     headers: {
@@ -39,6 +44,7 @@ export const fetchJoobleJobs = async (input: {
       page: "1",
     }),
     next: { revalidate: 0 },
+    signal: input.signal,
   });
 
   if (!res.ok) {

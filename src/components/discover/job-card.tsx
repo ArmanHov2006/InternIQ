@@ -1,10 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { ExternalLink, Loader2, MapPin, Sparkles, Clock, Building2 } from "lucide-react";
+import { ExternalLink, Loader2, MapPin, Sparkles, Clock, Building2, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 import type { Application, Opportunity } from "@/types/database";
-import { parseStoredAi } from "@/lib/services/discovery/ai-scorer";
+import {
+  getDiscoveryPrimaryScore,
+  getDiscoveryVerdictLabel,
+  parseStoredAi,
+} from "@/lib/services/discovery/ai-scorer";
 import { cn } from "@/lib/utils";
 import { useKanbanStore } from "@/stores/kanban-store";
 import { useDiscoverStore } from "@/stores/discover-store";
@@ -14,14 +18,10 @@ import { GlassCard } from "@/components/ui/glass-card";
 
 const scoreColor = (score: number | null) => {
   if (score == null) return { text: "text-muted-foreground", bg: "bg-muted", bar: "bg-muted-foreground/30" };
-  if (score >= 80) return { text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", bar: "bg-emerald-500" };
-  if (score >= 60) return { text: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", bar: "bg-amber-500" };
+  if (score >= 90) return { text: "text-emerald-600 dark:text-emerald-400", bg: "bg-emerald-500/10", bar: "bg-emerald-500" };
+  if (score >= 78) return { text: "text-teal-600 dark:text-teal-400", bg: "bg-teal-500/10", bar: "bg-teal-500" };
+  if (score >= 64) return { text: "text-amber-600 dark:text-amber-400", bg: "bg-amber-500/10", bar: "bg-amber-500" };
   return { text: "text-red-500 dark:text-red-400", bg: "bg-red-500/10", bar: "bg-red-500" };
-};
-
-const hasAiScore = (opportunity: Opportunity) => {
-  const score = opportunity.ai_score;
-  return score != null && typeof score === "object" && Object.keys(score as object).length > 0;
 };
 
 const relativeTime = (date: string | null): string => {
@@ -33,6 +33,25 @@ const relativeTime = (date: string | null): string => {
   if (days < 7) return `${days}d ago`;
   if (days < 30) return `${Math.floor(days / 7)}w ago`;
   return `${Math.floor(days / 30)}mo ago`;
+};
+
+const buildEvidencePreview = (opportunity: Opportunity) => {
+  const ai = parseStoredAi(opportunity);
+  if (ai?.evidence.length) return ai.evidence.slice(0, 2);
+
+  const matched = opportunity.matched_keywords ?? [];
+  const missing = opportunity.missing_keywords ?? [];
+  const preview: string[] = [];
+  if (matched.length > 0) {
+    preview.push(`Overlap on ${matched.slice(0, 3).join(", ")}.`);
+  }
+  if (missing.length > 0) {
+    preview.push(`Watch gaps in ${missing.slice(0, 2).join(", ")}.`);
+  }
+  if (preview.length === 0 && opportunity.match_summary) {
+    preview.push(opportunity.match_summary);
+  }
+  return preview.slice(0, 2);
 };
 
 interface JobCardProps {
@@ -145,17 +164,20 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
   };
 
   const ai = parseStoredAi(opportunity);
-  const score = opportunity.match_score;
-  const colors = scoreColor(score);
+  const primaryScore = getDiscoveryPrimaryScore(opportunity);
+  const colors = scoreColor(primaryScore);
   const matchedKw = opportunity.matched_keywords ?? [];
   const missingKw = opportunity.missing_keywords ?? [];
+  const evidence = buildEvidencePreview(opportunity);
   const posted = relativeTime(opportunity.posted_at ?? null);
+  const verdictLabel = ai ? getDiscoveryVerdictLabel(ai.verdict) : "Heuristic";
+  const heuristicScore = typeof opportunity.match_score === "number" ? opportunity.match_score : null;
 
   return (
     <GlassCard
       className={cn(
         "group relative p-4 transition-shadow duration-150 hover:shadow-md",
-        hasAiScore(opportunity) && "border-primary/20 shadow-glow-xs"
+        ai && "border-primary/20 shadow-glow-xs"
       )}
     >
       <div className="flex gap-3">
@@ -168,7 +190,6 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
         />
 
         <div className="min-w-0 flex-1 space-y-3">
-          {/* Header: Title + Score */}
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 space-y-0.5">
               <p className="text-sm font-semibold leading-snug text-foreground">
@@ -194,89 +215,186 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2 self-start">
               {opportunity.api_source ? (
                 <Badge variant="secondary" className="text-[10px] capitalize">
                   {opportunity.api_source}
                 </Badge>
               ) : null}
-              <div className={cn("rounded-md px-2 py-1 text-center", colors.bg)}>
-                <span className={cn("font-mono text-sm font-semibold tabular-nums", colors.text)}>
-                  {score ?? "--"}%
+              <div className={cn("min-w-[68px] rounded-xl px-2.5 py-2 text-center", colors.bg)}>
+                <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Fit
+                </p>
+                <span className={cn("font-mono text-base font-semibold tabular-nums", colors.text)}>
+                  {primaryScore ?? "--"}%
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Score Bar */}
-          <div className="space-y-1">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge
+                variant="outline"
+                className={cn(
+                  "rounded-full border px-2 py-0.5 text-[10px] font-medium",
+                  ai
+                    ? "border-border/80 bg-background/60 text-foreground"
+                    : "border-border/60 bg-muted/40 text-muted-foreground"
+                )}
+              >
+                {verdictLabel}
+              </Badge>
+              {ai ? (
+                <span className="text-[11px] text-muted-foreground">
+                  Conservative AI rerank
+                </span>
+              ) : (
+                <span className="text-[11px] text-muted-foreground">
+                  Retrieval score while AI rerank is unavailable
+                </span>
+              )}
+            </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div
                 className={cn("h-full rounded-full transition-all duration-300", colors.bar)}
-                style={{ width: `${Math.min(score ?? 0, 100)}%` }}
+                style={{ width: `${Math.min(primaryScore ?? 0, 100)}%` }}
               />
             </div>
-            {opportunity.salary_range ? (
-              <p className="font-mono text-xs text-muted-foreground">{opportunity.salary_range}</p>
-            ) : null}
           </div>
 
-          {/* Keyword chips */}
-          {matchedKw.length > 0 || missingKw.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {matchedKw.slice(0, 4).map((kw) => (
-                <span
-                  key={kw}
-                  className="inline-block rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
-                >
-                  {kw}
-                </span>
-              ))}
-              {missingKw.slice(0, 3).map((kw) => (
-                <span
-                  key={kw}
-                  className="inline-block rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
-                >
-                  {kw}
-                </span>
+          {opportunity.salary_range ? (
+            <p className="font-mono text-xs text-muted-foreground">{opportunity.salary_range}</p>
+          ) : null}
+
+          {evidence.length > 0 ? (
+            <div className="space-y-1 rounded-xl border border-border/60 bg-background/60 px-3 py-2.5">
+              {evidence.map((item) => (
+                <p key={item} className="text-xs leading-relaxed text-muted-foreground">
+                  {item}
+                </p>
               ))}
             </div>
           ) : null}
 
-          {/* AI Evaluation */}
-          {ai ? (
-            <details className="rounded-lg border border-border bg-muted/30 p-2.5 text-xs">
-              <summary className="cursor-pointer font-medium text-foreground">
-                AI evaluation -{" "}
-                <span className={cn("font-mono tabular-nums", scoreColor(ai.overall_score).text)}>
-                  {ai.overall_score}%
-                </span>
-              </summary>
-              <div className="mt-2 space-y-2">
-                <p className="leading-relaxed text-muted-foreground">{ai.reasoning}</p>
-                <div className="grid grid-cols-2 gap-1 font-mono text-[11px] text-muted-foreground">
-                  <span>Skills {ai.dimensions.skills}%</span>
-                  <span>Role fit {ai.dimensions.role_fit}%</span>
-                  <span>Growth {ai.dimensions.growth}%</span>
-                  <span>Practical {ai.dimensions.practical}%</span>
-                </div>
-                {ai.key_strengths.length ? (
-                  <p className="text-muted-foreground">
-                    <span className="font-medium text-emerald-500">Strengths:</span>{" "}
-                    {ai.key_strengths.join("; ")}
-                  </p>
-                ) : null}
-                {ai.key_gaps.length ? (
-                  <p className="text-muted-foreground">
-                    <span className="font-medium text-amber-500">Gaps:</span>{" "}
-                    {ai.key_gaps.join("; ")}
-                  </p>
-                ) : null}
-              </div>
-            </details>
-          ) : null}
+          <details className="rounded-xl border border-border/60 bg-muted/20 px-3 py-2.5 text-xs">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 font-medium text-foreground">
+              <span>Why this surfaced</span>
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
+            </summary>
+            <div className="mt-3 space-y-3 text-muted-foreground">
+              {ai?.reasoning ? (
+                <p className="leading-relaxed">{ai.reasoning}</p>
+              ) : (
+                <p className="leading-relaxed">{opportunity.match_summary}</p>
+              )}
 
-          {/* Actions */}
+              <div className="grid gap-2 sm:grid-cols-2">
+                <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    Primary score
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-foreground">
+                    {primaryScore ?? "--"} / 100
+                  </p>
+                </div>
+                <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    Heuristic score
+                  </p>
+                  <p className="mt-1 font-mono text-sm text-foreground">
+                    {heuristicScore ?? "--"} / 100
+                  </p>
+                </div>
+              </div>
+
+              {ai ? (
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      Subscores
+                    </p>
+                    <div className="mt-1 space-y-1 font-mono text-[11px]">
+                      <p>Must-have {ai.subscores.must_have}%</p>
+                      <p>Seniority {ai.subscores.seniority}%</p>
+                      <p>Skills {ai.subscores.skills}%</p>
+                      <p>Logistics {ai.subscores.logistics}%</p>
+                      <p>Upside {ai.subscores.upside}%</p>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-border/50 bg-background/70 px-2.5 py-2">
+                    <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                      Risk flags
+                    </p>
+                    {ai.gating_flags.length > 0 ? (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {ai.gating_flags.map((flag) => (
+                          <span
+                            key={flag}
+                            className="rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] text-amber-500"
+                          >
+                            {flag.replace(/_/g, " ")}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="mt-1 text-[11px] text-muted-foreground">No major gating flags.</p>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {matchedKw.length > 0 ? (
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    Matched
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {matchedKw.slice(0, 6).map((kw) => (
+                      <span
+                        key={kw}
+                        className="rounded-md bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {missingKw.length > 0 ? (
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    Gaps
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {missingKw.slice(0, 5).map((kw) => (
+                      <span
+                        key={kw}
+                        className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                      >
+                        {kw}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {ai?.gaps.length ? (
+                <div>
+                  <p className="text-[10px] uppercase tracking-[0.15em] text-muted-foreground">
+                    AI-noted gaps
+                  </p>
+                  <div className="mt-1 space-y-1">
+                    {ai.gaps.map((gap) => (
+                      <p key={gap}>{gap}</p>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </details>
+
           <div className="flex flex-wrap gap-1.5">
             <Button
               type="button"

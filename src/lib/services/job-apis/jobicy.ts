@@ -8,6 +8,7 @@ const SENIOR_RE = /\b(senior|sr\.?|staff|lead|principal|director|vp|chief|head|a
 export const fetchJobicyJobs = async (input: {
   keywords: string[];
   roleTypes: string[];
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const params = new URLSearchParams({ count: "20" });
   if (input.keywords.length > 0) {
@@ -15,7 +16,7 @@ export const fetchJobicyJobs = async (input: {
   }
 
   const url = `${JOBICY_BASE}?${params.toString()}`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
   if (!res.ok) {
     throw new Error(`Jobicy HTTP ${res.status}`);
   }

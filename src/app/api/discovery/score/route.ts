@@ -2,9 +2,7 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured, withAuth } from "@/lib/server/route-utils";
 import { isJobDiscoveryEnabled } from "@/lib/features";
 import { checkAiRateLimit } from "@/lib/rate-limit";
-import { getResumeAndKeywords } from "@/lib/server/resume-keywords";
-import { scoreJobSnippetsWithClaude } from "@/lib/services/discovery/ai-scorer";
-import type { Opportunity } from "@/types/database";
+import { scoreDiscoveryShortlistForUser } from "@/lib/services/discovery/score-discovery";
 
 export async function POST(request: Request) {
   if (!isJobDiscoveryEnabled()) {
@@ -34,71 +32,26 @@ export async function POST(request: Request) {
   const explicitIds = Array.isArray(body.opportunity_ids)
     ? (body.opportunity_ids as unknown[]).map(String).filter(Boolean)
     : null;
+  const runId = typeof body.runId === "string" && body.runId.trim() ? body.runId.trim() : undefined;
 
-  const { data: rows, error } = await supabase
-    .from("opportunities")
-    .select("*")
-    .eq("user_id", user.id)
-    .gte("match_score", 60)
-    .not("api_source", "is", null);
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
-
-  let candidates = (rows ?? []) as Opportunity[];
-  candidates = candidates.filter((row) => {
-    const a = row.ai_score;
-    return a == null || (typeof a === "object" && Object.keys(a as object).length === 0);
-  });
-
-  if (explicitIds?.length) {
-    const set = new Set(explicitIds);
-    candidates = candidates.filter((c) => set.has(c.id));
-  }
-
-  candidates = candidates.slice(0, 15);
-  if (candidates.length === 0) {
-    return NextResponse.json({ scored: 0, message: "No eligible jobs." });
-  }
-
-  const { resumeText, profileKeywords, profileContextText } = await getResumeAndKeywords(
-    supabase,
-    user.id
-  );
-
-  let scored = 0;
-  const chunkSize = 5;
-
-  for (let i = 0; i < candidates.length; i += chunkSize) {
-    const chunk = candidates.slice(i, i + chunkSize);
-    const snippets = chunk.map((c) => ({
-      id: c.id,
-      title: c.role,
-      company: c.company,
-      descriptionSnippet: (c.job_description || "").slice(0, 500),
-    }));
-
-    const scores = await scoreJobSnippetsWithClaude({
-      resumeText: profileContextText || resumeText,
-      profileSkills: profileKeywords,
-      jobs: snippets,
+  try {
+    const result = await scoreDiscoveryShortlistForUser(supabase, user.id, {
+      runId,
+      opportunityIds: explicitIds ?? undefined,
+      limit: 15,
     });
 
-    for (const opp of chunk) {
-      const s = scores.get(opp.id);
-      if (!s) continue;
-      const { error: upErr } = await supabase
-        .from("opportunities")
-        .update({
-          ai_score: s as unknown as Record<string, unknown>,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", opp.id)
-        .eq("user_id", user.id);
-      if (!upErr) scored += 1;
+    if (result.candidates === 0) {
+      return NextResponse.json({ scored: 0, message: "No eligible jobs.", runId: result.runId });
     }
-  }
 
-  return NextResponse.json({ scored });
+    return NextResponse.json({
+      scored: result.scored,
+      candidates: result.candidates,
+      runId: result.runId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Scoring failed";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }

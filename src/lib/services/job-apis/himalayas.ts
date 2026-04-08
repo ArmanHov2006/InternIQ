@@ -8,6 +8,7 @@ const ENTRY_RE = /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|g
 export const fetchHimalayasJobs = async (input: {
   keywords: string[];
   roleTypes: string[];
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const hasEntryLevel = input.roleTypes.some((r) =>
     /\b(intern(ship)?|junior|entry[\s-]?level|co[\s-]?op|new grad|graduate)\b/i.test(r)
@@ -19,7 +20,7 @@ export const fetchHimalayasJobs = async (input: {
   }
 
   const url = `${HIMALAYAS_BASE}?${params.toString()}`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
   if (!res.ok) {
     throw new Error(`Himalayas HTTP ${res.status}`);
   }

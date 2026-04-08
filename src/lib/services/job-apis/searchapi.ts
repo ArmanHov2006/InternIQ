@@ -25,6 +25,8 @@ export const fetchSearchApiJobs = async (input: {
   keywords: string[];
   locations: string[];
   roleTypes: string[];
+  remoteQuery?: boolean;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const apiKey = process.env.SEARCHAPI_API_KEY;
   if (!apiKey) {
@@ -35,17 +37,20 @@ export const fetchSearchApiJobs = async (input: {
   if (hasEntryLevelRoleTypes(input.roleTypes)) {
     query = `${query} intern OR junior OR entry level`.trim();
   }
+  if (input.remoteQuery) {
+    query = `${query} remote`.trim();
+  }
 
   const params = new URLSearchParams({
     engine: "google_jobs",
     api_key: apiKey,
-    q: query,
-    location: input.locations[0] || "United States",
+    q: query || (input.remoteQuery ? "remote software intern" : "software intern"),
+    location: input.remoteQuery ? "Remote" : input.locations[0] || "United States",
     chips: "date_posted:week",
   });
 
   const url = `${SEARCHAPI_BASE}?${params.toString()}`;
-  const res = await fetch(url, { next: { revalidate: 0 } });
+  const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
 
   if (!res.ok) {
     throw new Error(`SearchApi HTTP ${res.status}`);

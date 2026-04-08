@@ -3,7 +3,12 @@ import { hasEntryLevelRoleTypes } from "@/lib/services/career-os";
 
 const JSEARCH_BASE = "https://jsearch.p.rapidapi.com/search";
 
-const buildQuery = (keywords: string[], locations: string[], roleTypes: string[]): string => {
+const buildQuery = (
+  keywords: string[],
+  locations: string[],
+  roleTypes: string[],
+  remoteQuery = false
+): string => {
   const parts: string[] = [];
 
   if (keywords.length > 0) {
@@ -14,24 +19,28 @@ const buildQuery = (keywords: string[], locations: string[], roleTypes: string[]
     parts.push("intern OR junior OR entry level");
   }
 
-  if (locations.length > 0) {
+  if (remoteQuery) {
+    parts.push("remote");
+  } else if (locations.length > 0) {
     parts.push(`in ${locations[0]}`);
   }
 
-  return parts.join(" ") || "software intern";
+  return parts.join(" ") || (remoteQuery ? "remote software intern" : "software intern");
 };
 
 export const fetchJSearchJobs = async (input: {
   keywords: string[];
   locations: string[];
   roleTypes: string[];
+  remoteQuery?: boolean;
+  signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
   const apiKey = process.env.JSEARCH_API_KEY;
   if (!apiKey) {
     throw new Error("JSearch API key not configured");
   }
 
-  const query = buildQuery(input.keywords, input.locations, input.roleTypes);
+  const query = buildQuery(input.keywords, input.locations, input.roleTypes, input.remoteQuery);
   const employmentTypes = hasEntryLevelRoleTypes(input.roleTypes) ? "INTERN,FULLTIME" : "FULLTIME";
 
   const params = new URLSearchParams({
@@ -49,6 +58,7 @@ export const fetchJSearchJobs = async (input: {
       "X-RapidAPI-Host": "jsearch.p.rapidapi.com",
     },
     next: { revalidate: 0 },
+    signal: input.signal,
   });
 
   if (!res.ok) {

@@ -542,7 +542,6 @@ export const FeaturesBento = () => {
                 <div className="relative">
                   <LandingVideoFrame
                     webm="/assets/videos/demo-smart-apply.webm"
-                    mp4="/assets/videos/demo-smart-apply.mp4"
                     poster="/assets/videos/poster-smart-apply.jpg"
                     className="aspect-[16/9] min-h-[260px]"
                     fallback={<SmartApplyFallback />}

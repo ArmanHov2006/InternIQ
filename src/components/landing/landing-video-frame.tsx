@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 
 interface LandingVideoFrameProps {
   webm: string;
-  mp4: string;
+  mp4?: string;
   poster: string;
   fallback?: ReactNode;
   className?: string;
@@ -66,7 +66,7 @@ export const LandingVideoFrame = ({
           )}
         >
           <source src={webm} type="video/webm" />
-          <source src={mp4} type="video/mp4" />
+          {mp4 ? <source src={mp4} type="video/mp4" /> : null}
         </video>
       ) : null}
     </div>
