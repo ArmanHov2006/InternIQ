@@ -3,8 +3,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import type { Application } from "@/types/database";
+import { BarChart3 } from "lucide-react";
+import Link from "next/link";
 import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -235,30 +239,48 @@ export default function InsightsPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-muted-foreground">Loading…</p>
+        <div className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <SkeletonShimmer className="h-20" />
+            <SkeletonShimmer className="h-20" />
+            <SkeletonShimmer className="h-20" />
+            <SkeletonShimmer className="h-20" />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <SkeletonShimmer className="h-56" />
+            <SkeletonShimmer className="h-56" />
+          </div>
+        </div>
       ) : applications.length === 0 ? (
-        <GlassCard className="p-6">
-          <p className="text-sm text-muted-foreground">Add applications to see insights.</p>
-        </GlassCard>
+        <EmptyState
+          icon={<BarChart3 className="h-5 w-5" />}
+          title="Insights need data"
+          description="Add at least 3 applications to unlock analytics and AI-powered recommendations."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/dashboard/pipeline">Go to pipeline</Link>
+            </Button>
+          }
+        />
       ) : (
         <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <GlassCard className="p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
-              <p className="mt-1 text-2xl font-semibold">{applications.length}</p>
+              <p className="mt-1 text-2xl font-mono font-semibold">{applications.length}</p>
             </GlassCard>
             <GlassCard className="p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Response rate</p>
-              <p className="mt-1 text-2xl font-semibold">{responseRate}%</p>
+              <p className="mt-1 text-2xl font-mono font-semibold">{responseRate}%</p>
               <p className="text-xs text-muted-foreground">Past &quot;saved&quot; stage</p>
             </GlassCard>
             <GlassCard className="p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Avg. days since update</p>
-              <p className="mt-1 text-2xl font-semibold">{avgDaysSinceUpdate}</p>
+              <p className="mt-1 text-2xl font-mono font-semibold">{avgDaysSinceUpdate}</p>
             </GlassCard>
             <GlassCard className="p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">This week (new)</p>
-              <p className="mt-1 text-2xl font-semibold">{velocity[7] ?? 0}</p>
+              <p className="mt-1 text-2xl font-mono font-semibold">{velocity[7] ?? 0}</p>
             </GlassCard>
           </div>
 
@@ -366,7 +388,7 @@ export default function InsightsPage() {
                   <li key={app.id} className="rounded-md border border-border px-3 py-2">
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">{app.company} — {app.role}</p>
-                      <span className="text-xs text-muted-foreground">{staleDays}d since update</span>
+                      <span className="text-xs text-muted-foreground">{staleDays} days since last update</span>
                     </div>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Suggested action: send a concise follow-up mentioning continued interest and one role-specific value point.

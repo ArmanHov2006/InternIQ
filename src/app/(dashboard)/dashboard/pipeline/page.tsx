@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Briefcase, Plus } from "lucide-react";
+import { Briefcase, Plus, Sparkles } from "lucide-react";
+import Link from "next/link";
 import { toast } from "sonner";
 import type { Application } from "@/types/database";
 import { AddApplicationDialog } from "@/components/dashboard/add-application-dialog";
@@ -76,12 +77,20 @@ export default function PipelinePage() {
         <EmptyState
           icon={<Briefcase className="h-5 w-5" />}
           title="No applications yet"
-          description="Add your first application to start tracking."
+          description="Your pipeline is empty — add an application manually or discover jobs with AI."
           action={
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setDialogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Add application
-            </Button>
+            <div className="flex items-center gap-3">
+              <Button size="sm" className="gap-2" onClick={() => setDialogOpen(true)}>
+                <Plus className="h-4 w-4" />
+                Add application
+              </Button>
+              <Button variant="outline" size="sm" className="gap-2" asChild>
+                <Link href="/dashboard/discover">
+                  <Sparkles className="h-4 w-4" />
+                  Discover jobs
+                </Link>
+              </Button>
+            </div>
           }
         />
       ) : null}
