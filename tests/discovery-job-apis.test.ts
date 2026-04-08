@@ -7,6 +7,7 @@ import {
   filterJobsByRoleTypeSeniority,
   type NormalizedJob,
 } from "@/lib/services/job-apis";
+import { fetchGreenhouseJobs, fetchGreenhouseJobsForSlug } from "@/lib/services/job-apis/greenhouse";
 import { fetchJobicyJobs } from "@/lib/services/job-apis/jobicy";
 
 describe("discovery job api filters", () => {
@@ -15,6 +16,7 @@ describe("discovery job api filters", () => {
     vi.unstubAllGlobals();
     delete process.env.ADZUNA_APP_ID;
     delete process.env.ADZUNA_APP_KEY;
+    delete process.env.THEMUSE_API_KEY;
   });
 
   it("skips senior jobicy roles for entry-level searches", async () => {
@@ -224,6 +226,164 @@ describe("discovery job api filters", () => {
     expect(
       adzunaCalls.some((url) => !url.includes("where=") && decodeURIComponent(url).includes("remote"))
     ).toBe(true);
+  });
+
+  it("surfaces disabled keyed sources in source availability", async () => {
+    process.env.ADZUNA_APP_ID = "app-id";
+    process.env.ADZUNA_APP_KEY = "app-key";
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.adzuna.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      if (url.includes("jobicy.com")) {
+        return { ok: true, json: async () => ({ jobs: [] }) };
+      }
+      if (url.includes("remoteok.com")) {
+        return { ok: true, json: async () => [] };
+      }
+      if (url.includes("himalayas.app")) {
+        return { ok: true, json: async () => ({ jobs: [] }) };
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await fetchAllDiscoveryJobs({
+      keywords: ["python"],
+      locations: ["Toronto"],
+      remotePreference: "any",
+      roleTypes: ["intern", "junior"],
+      excludedCompanies: [],
+      greenhouseSlugs: [],
+      adzunaMaxPages: 1,
+      sourceTimeoutMs: 250,
+    });
+
+    expect(result.sourceAvailability.adzuna?.enabled).toBe(true);
+    expect(result.sourceAvailability.jsearch?.enabled).toBe(false);
+    expect(result.sourceAvailability.jsearch?.reason).toContain("JSEARCH_API_KEY");
+    expect(result.sourceAvailability.searchapi?.enabled).toBe(false);
+  });
+
+  it("requests expanded greenhouse content and uses location.name", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        jobs: [
+          {
+            id: 1,
+            title: "Software Engineer Intern",
+            absolute_url: "https://example.com/gh/1",
+            updated_at: "2026-04-06T00:00:00.000Z",
+            content: "<p>Build backend systems.</p>",
+            location: { name: "Toronto, ON" },
+            metadata: [{ name: "Location", value: "Remote" }],
+          },
+        ],
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const jobs = await fetchGreenhouseJobsForSlug("acme");
+
+    expect(String(fetchMock.mock.calls[0]?.[0])).toContain("content=true");
+    expect(jobs[0]?.location).toBe("Toronto, ON");
+    expect(jobs[0]?.description).toContain("Build backend systems.");
+  });
+
+  it("keeps partial greenhouse jobs when a later slug times out", async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn((url: string) => {
+      if (url.includes("/boards/acme/jobs")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            jobs: [
+              {
+                id: 1,
+                title: "Software Engineer Intern",
+                absolute_url: "https://example.com/gh/1",
+                updated_at: "2026-04-06T00:00:00.000Z",
+                content: "<p>Build backend systems.</p>",
+                location: { name: "Toronto, ON" },
+              },
+            ],
+          }),
+        });
+      }
+      if (url.includes("/boards/slow/jobs")) {
+        return new Promise((_, reject) => {
+          controller.signal.addEventListener(
+            "abort",
+            () => reject(new DOMException("The operation was aborted.", "AbortError")),
+            { once: true }
+          );
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const resultPromise = fetchGreenhouseJobs(["acme", "slow"], 20, controller.signal);
+    await Promise.resolve();
+    controller.abort();
+    const result = await resultPromise;
+
+    expect(result.jobs).toHaveLength(1);
+    expect(result.timedOut).toBe(true);
+    expect(result.errors.slow).toContain("timed out");
+  });
+
+  it("requests broader himalayas coverage and multiple adzuna pages", async () => {
+    process.env.ADZUNA_APP_ID = "app-id";
+    process.env.ADZUNA_APP_KEY = "app-key";
+    process.env.THEMUSE_API_KEY = "muse-key";
+
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("api.adzuna.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      if (url.includes("jobicy.com")) {
+        return { ok: true, json: async () => ({ jobs: [] }) };
+      }
+      if (url.includes("remoteok.com")) {
+        return { ok: true, json: async () => [] };
+      }
+      if (url.includes("himalayas.app")) {
+        return { ok: true, json: async () => ({ jobs: [] }) };
+      }
+      if (url.includes("themuse.com")) {
+        return { ok: true, json: async () => ({ results: [] }) };
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchAllDiscoveryJobs({
+      keywords: ["python"],
+      locations: ["Toronto"],
+      remotePreference: "any",
+      roleTypes: ["intern", "junior"],
+      excludedCompanies: [],
+      greenhouseSlugs: [],
+      adzunaMaxPages: 4,
+      sourceTimeoutMs: 250,
+    });
+
+    const adzunaCalls = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("api.adzuna.com"));
+    const himalayasCalls = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("himalayas.app"));
+    const museCalls = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("themuse.com"));
+
+    expect(adzunaCalls).toHaveLength(8);
+    expect(himalayasCalls).toHaveLength(3);
+    expect(museCalls).toHaveLength(3);
   });
 
   it("still excludes fully remote jobs when onsite is required", () => {

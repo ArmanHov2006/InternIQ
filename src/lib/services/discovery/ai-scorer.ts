@@ -13,6 +13,7 @@ export type DiscoveryGatingFlag =
 
 export type DiscoveryAiScore = {
   version: number;
+  run_id?: string;
   heuristic_score: number;
   final_score: number;
   verdict: DiscoveryVerdict;
@@ -118,6 +119,7 @@ export const calibrateDiscoveryAiScore = (input: {
   heuristicScore: number | null;
   raw: RawDiscoveryAiScore;
   fallbackGatingFlags?: DiscoveryGatingFlag[];
+  runId?: string;
 }): DiscoveryAiScore => {
   const heuristicScore = clampPercent(input.heuristicScore ?? 0);
   const rawSubscores = input.raw.subscores ?? {};
@@ -202,6 +204,7 @@ export const calibrateDiscoveryAiScore = (input: {
 
   return {
     version: DISCOVERY_AI_SCORE_VERSION,
+    run_id: input.runId,
     heuristic_score: heuristicScore,
     final_score: finalScore,
     verdict: verdictFromScore(finalScore),
@@ -238,6 +241,7 @@ export const parseStoredAi = (row: { ai_score?: unknown }): DiscoveryAiScore | n
         typeof record.version === "number"
           ? Math.max(1, Math.round(record.version))
           : DISCOVERY_AI_SCORE_VERSION,
+      run_id: typeof record.run_id === "string" ? record.run_id : undefined,
       heuristic_score:
         typeof record.heuristic_score === "number" ? clampPercent(record.heuristic_score) : 0,
       final_score: clampPercent(record.final_score),
@@ -280,6 +284,7 @@ export const parseStoredAi = (row: { ai_score?: unknown }): DiscoveryAiScore | n
   const finalScore = clampPercent(legacy.overall_score);
   return {
     version: 1,
+    run_id: typeof record.run_id === "string" ? record.run_id : undefined,
     heuristic_score: 0,
     final_score: finalScore,
     verdict: verdictFromScore(finalScore),
@@ -413,6 +418,7 @@ Each object must have:
         heuristicScore: job.heuristicScore,
         raw,
         fallbackGatingFlags: job.gatingFlags,
+        runId: undefined,
       })
     );
   });

@@ -23,6 +23,14 @@ export interface NormalizedJob {
   posted_at: string | null;
 }
 
+export interface DiscoverySourceAvailability {
+  enabled: boolean;
+  keyed: boolean;
+  paid: boolean;
+  requiresEnv: string[];
+  reason: string | null;
+}
+
 export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
 
 export interface DiscoveryFetchInput {
@@ -42,6 +50,8 @@ export interface SourceFetchStat {
   durationMs: number;
   timedOut: boolean;
   error: string | null;
+  limited?: boolean;
+  note?: string | null;
 }
 
 export interface SourceFetchResult {
@@ -50,6 +60,8 @@ export interface SourceFetchResult {
   durationMs: number;
   timedOut: boolean;
   error?: string;
+  limited?: boolean;
+  note?: string;
 }
 
 export interface DiscoveryFetchStageCounts {
@@ -63,6 +75,7 @@ export interface DiscoveryFetchResult {
   jobs: NormalizedJob[];
   sourceErrors: Record<string, string>;
   sourceStats: Record<string, SourceFetchStat>;
+  sourceAvailability: Record<JobApiSource, DiscoverySourceAvailability>;
   sourceQueryLocations: string[];
   stageCounts: DiscoveryFetchStageCounts;
 }

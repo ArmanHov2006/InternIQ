@@ -59,7 +59,7 @@ export const DiscoveryStats = ({ opportunities }: DiscoveryStatsProps) => {
   return (
     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
       <StatCard
-        label="Active shortlist"
+        label="Active discovered"
         value={String(total)}
         icon={Briefcase}
       />

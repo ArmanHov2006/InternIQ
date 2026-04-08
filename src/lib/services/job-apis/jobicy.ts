@@ -8,9 +8,11 @@ const SENIOR_RE = /\b(senior|sr\.?|staff|lead|principal|director|vp|chief|head|a
 export const fetchJobicyJobs = async (input: {
   keywords: string[];
   roleTypes: string[];
+  count?: number;
   signal?: AbortSignal;
 }): Promise<NormalizedJob[]> => {
-  const params = new URLSearchParams({ count: "20" });
+  const count = Math.max(1, Math.min(input.count ?? 20, 50));
+  const params = new URLSearchParams({ count: String(count) });
   if (input.keywords.length > 0) {
     params.set("tag", input.keywords.slice(0, 3).join(","));
   }

@@ -55,7 +55,7 @@ export const fetchAdzunaJobs = async (input: {
       : "";
   const excludeParam = whatExclude ? `&what_exclude=${encodeURIComponent(whatExclude)}` : "";
 
-  const pages = Math.min(Math.max(1, input.maxPages), 2);
+  const pages = Math.min(Math.max(1, input.maxPages), 4);
   const all: NormalizedJob[] = [];
 
   for (let page = 1; page <= pages; page += 1) {

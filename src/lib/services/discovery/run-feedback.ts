@@ -1,4 +1,4 @@
-import type { DiscoveryRunDiagnostics } from "@/types/database";
+import type { DiscoveryRunDiagnostics, DiscoverySourceAvailability } from "@/types/database";
 
 export type RunFeedback = {
   tone: "success" | "warning" | "error";
@@ -41,6 +41,19 @@ const summarizeSourceIssues = (sourceErrors?: Record<string, string>): string | 
   return `${summaries[0]}, ${summaries[1]}, and ${summaries.length - 2} other sources had issues`;
 };
 
+const summarizeUnavailableSources = (
+  sourceAvailability?: Record<string, DiscoverySourceAvailability>
+): string | null => {
+  if (!sourceAvailability) return null;
+
+  const unavailable = Object.entries(sourceAvailability)
+    .filter(([, value]) => !value.enabled)
+    .map(([source, value]) => `${prettifySourceName(source)} (${value.reason ?? "Unavailable"})`);
+
+  if (unavailable.length === 0) return null;
+  return `Optional sources unavailable: ${unavailable.join(" | ")}`;
+};
+
 export const formatExecutedContext = (
   diagnostics?: DiscoveryRunDiagnostics
 ): string | null => {
@@ -67,11 +80,16 @@ export const formatRunFeedback = (input: {
   updated: number;
   reactivated: number;
   sourceErrors?: Record<string, string>;
+  sourceAvailability?: Record<string, DiscoverySourceAvailability>;
 }): RunFeedback => {
   const diagnostics = input.diagnostics;
   const sourceIssueSummary = summarizeSourceIssues(input.sourceErrors);
+  const availabilitySummary = summarizeUnavailableSources(
+    input.sourceAvailability ?? diagnostics?.sourceAvailability
+  );
   const details = [
     formatExecutedContext(diagnostics),
+    availabilitySummary,
     input.sourceErrors && Object.keys(input.sourceErrors).length > 0
       ? `Source issues: ${Object.entries(input.sourceErrors)
           .map(([source, message]) => `${source}: ${message}`)
@@ -143,6 +161,7 @@ export const getDiscoverEmptyState = (input: {
     reviewedCount: number;
     sourceErrors?: Record<string, string>;
     diagnostics?: DiscoveryRunDiagnostics;
+    sourceAvailability?: Record<string, DiscoverySourceAvailability>;
   } | null;
   minMatchScore: number;
 }): EmptyStateCopy => {
@@ -159,6 +178,9 @@ export const getDiscoverEmptyState = (input: {
 
   if (latestRun && (latestRun.reviewedCount > 0 || diagnostics)) {
     const sourceIssueSummary = summarizeSourceIssues(latestRun.sourceErrors);
+    const availabilitySummary = summarizeUnavailableSources(
+      latestRun.sourceAvailability ?? diagnostics?.sourceAvailability
+    );
     let description = `The latest run reviewed ${latestRun.reviewedCount} roles.`;
 
     if (diagnostics?.reasonCode === "score_threshold_filtered_out") {
@@ -172,6 +194,9 @@ export const getDiscoverEmptyState = (input: {
 
     if (sourceIssueSummary) {
       description = `${description} ${sourceIssueSummary}.`;
+    }
+    if (availabilitySummary) {
+      description = `${description} ${availabilitySummary}.`;
     }
 
     return {

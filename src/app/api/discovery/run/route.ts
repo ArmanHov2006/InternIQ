@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { isSupabaseConfigured, withAuth } from "@/lib/server/route-utils";
 import { isJobDiscoveryEnabled } from "@/lib/features";
 import { runDiscoveryForUser } from "@/lib/services/discovery/run-discovery";
-import { scoreDiscoveryShortlistForUser } from "@/lib/services/discovery/score-discovery";
 
 export async function POST() {
   if (!isJobDiscoveryEnabled()) {
@@ -43,27 +42,18 @@ export async function POST() {
       );
     }
 
-    try {
-      await scoreDiscoveryShortlistForUser(supabase, user.id, {
-        runId: result.runId,
-        limit: 15,
-      });
-    } catch (scoreError) {
-      console.error("discovery auto-score", scoreError);
-    }
-
     return NextResponse.json({
       runId: result.runId,
       reviewedCount: result.reviewedCount,
       activeCount: result.activeCount,
       archivedCount: result.archivedCount,
-        updatedCount: result.updatedCount,
-        reactivatedCount: result.reactivatedCount,
-        newOpportunitiesCount: result.newOpportunitiesCount,
-        resultsCount: result.resultsCount,
-        sourceErrors: result.sourceErrors,
-        diagnostics: result.diagnostics,
-      });
+      updatedCount: result.updatedCount,
+      reactivatedCount: result.reactivatedCount,
+      newOpportunitiesCount: result.newOpportunitiesCount,
+      resultsCount: result.resultsCount,
+      sourceErrors: result.sourceErrors,
+      diagnostics: result.diagnostics,
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Discovery failed";
     return NextResponse.json({ error: message }, { status: 500 });

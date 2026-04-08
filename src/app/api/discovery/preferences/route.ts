@@ -71,7 +71,7 @@ export async function PUT(request: Request) {
       ? remoteRaw
       : "any";
 
-  let min_match_score = 55;
+  let min_match_score = 50;
   if (typeof body.min_match_score === "number") {
     min_match_score = Math.max(0, Math.min(100, Math.round(body.min_match_score)));
   }

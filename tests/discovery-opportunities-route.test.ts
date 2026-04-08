@@ -109,6 +109,9 @@ const makeOpportunity = (overrides: Partial<Opportunity>): Opportunity => ({
   discovery_run_id: overrides.discovery_run_id ?? "run-1",
   ai_score: overrides.ai_score ?? {},
   posted_at: overrides.posted_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_last_seen_at: overrides.discovery_last_seen_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_missed_runs: overrides.discovery_missed_runs ?? 0,
+  discovery_is_stale: overrides.discovery_is_stale ?? false,
 });
 
 describe("opportunities discovery scope", () => {
@@ -122,6 +125,11 @@ describe("opportunities discovery scope", () => {
         new Request("http://localhost/api/opportunities?discovery_scope=latest_shortlist")
       )
     ).toBe("latest_shortlist");
+    expect(
+      resolveDiscoveryScope(
+        new Request("http://localhost/api/opportunities?discovery_scope=active_discovered")
+      )
+    ).toBe("active_discovered");
     expect(resolveDiscoveryScope(new Request("http://localhost/api/opportunities"))).toBeNull();
   });
 
@@ -177,5 +185,42 @@ describe("opportunities discovery scope", () => {
 
     expect(response.status).toBe(200);
     expect(data.map((row) => row.id)).toEqual(["latest-new"]);
+  });
+
+  it("returns active discovered jobs across runs with fresh rows first", async () => {
+    const opportunityRows = [
+      makeOpportunity({ id: "fresh", discovery_run_id: "run-latest", status: "new", discovery_is_stale: false }),
+      makeOpportunity({ id: "stale", discovery_run_id: "run-old", status: "new", discovery_is_stale: true }),
+      makeOpportunity({ id: "saved", discovery_run_id: "run-latest", status: "saved", application_id: "app-1" }),
+    ];
+
+    const supabase = {
+      from: (table: string) => {
+        if (table === "opportunities") {
+          return {
+            select: () =>
+              createPromiseChain((filters) => ({
+                data: applyFilters(opportunityRows, filters),
+                error: null,
+              })),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    withAuthMock.mockResolvedValue({
+      supabase,
+      user: { id: "user-1" },
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/opportunities?discovery_scope=active_discovered")
+    );
+    const data = (await response.json()) as Opportunity[];
+
+    expect(response.status).toBe(200);
+    expect(data.map((row) => row.id)).toEqual(["fresh", "stale"]);
   });
 });

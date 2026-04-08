@@ -11,6 +11,7 @@ import {
   mergeDiscoveryPreferencesRow,
   type DiscoveryPreferencesRow as DiscoveryPreferencesRowType,
 } from "@/lib/services/discovery/resume-context";
+import { buildDiscoverySourceAvailability } from "@/lib/services/job-apis/source-registry";
 import { buildLocationAwareQuerySpecs, fetchAllDiscoveryJobs } from "@/lib/services/job-apis";
 import type {
   DiscoveryRunDiagnostics,
@@ -20,6 +21,8 @@ import type {
 } from "@/types/database";
 
 export type DiscoveryPreferencesRow = DiscoveryPreferencesRowType;
+
+const STALE_DISCOVERY_MISS_LIMIT = 3;
 
 const uniqueNonEmpty = (values: Array<string | null | undefined>): string[] =>
   Array.from(
@@ -110,6 +113,7 @@ const buildEmptyDiagnostics = (
     reactivated: 0,
   },
   sourceStats: {},
+  sourceAvailability: buildDiscoverySourceAvailability(),
 });
 
 const classifyDiscoveryReasonCode = (input: {
@@ -213,14 +217,7 @@ export async function runDiscoveryForUser(
       updatedCount: 0,
       reactivatedCount: 0,
       sourceErrors: {},
-      diagnostics: buildEmptyDiagnostics(
-        prefs.remote_preference === "remote_only" ||
-          prefs.remote_preference === "hybrid" ||
-          prefs.remote_preference === "onsite" ||
-          prefs.remote_preference === "any"
-          ? prefs.remote_preference
-          : "any"
-      ),
+      diagnostics: buildEmptyDiagnostics(normalizeRemotePreference(prefs.remote_preference)),
       inactive: true,
     };
   }
@@ -262,7 +259,7 @@ export async function runDiscoveryForUser(
       role_types: searchContext.roleTypes,
       remote_preference: remotePreference,
     },
-    adzuna_pages: 2,
+    adzuna_pages: 4,
   };
 
   const { data: runInsert, error: runErr } = await supabase
@@ -292,9 +289,9 @@ export async function runDiscoveryForUser(
       excludedCompanies: prefs.excluded_companies ?? [],
       greenhouseSlugs:
         (prefs.greenhouse_slugs ?? []).length > 0 ? prefs.greenhouse_slugs! : DEFAULT_GREENHOUSE_SLUGS,
-      adzunaMaxPages: 2,
+      adzunaMaxPages: 4,
     });
-    const { jobs, sourceErrors, sourceStats } = discoveryJobsResult;
+    const { jobs, sourceErrors, sourceStats, sourceAvailability } = discoveryJobsResult;
     const executedSourceQueryLocations =
       discoveryJobsResult.sourceQueryLocations.length > 0
         ? discoveryJobsResult.sourceQueryLocations
@@ -311,7 +308,7 @@ export async function runDiscoveryForUser(
       ...searchContext.keywords,
       ...searchContext.roleTypes,
     ]);
-    const minScore = prefs.min_match_score ?? 55;
+    const minScore = prefs.min_match_score ?? 50;
     const runTimestamp = new Date().toISOString();
 
     const { data: existingRows, error: existingError } = await supabase
@@ -327,61 +324,100 @@ export async function runDiscoveryForUser(
 
     const existingOpportunities = (existingRows ?? []) as Opportunity[];
     const existingByKey = buildExistingOpportunityMap(existingOpportunities);
-    const archivedCount = existingOpportunities.filter(
-      (row) => row.status === "new" && !row.application_id
-    ).length;
+    const finalActiveKeys = new Set(
+      existingOpportunities
+        .filter((row) => row.status === "new" && row.api_source && row.api_job_id)
+        .map((row) => buildApiDedupeKey(row.api_source!, row.api_job_id!))
+    );
 
-    if (archivedCount > 0) {
-      const { error: archiveError } = await supabase
-        .from("opportunities")
-        .update({
-          status: "archived",
-          updated_at: runTimestamp,
-        })
-        .eq("user_id", userId)
-        .eq("source", "recommendation")
-        .eq("status", "new")
-        .not("api_source", "is", null)
-        .is("application_id", null);
+    const shortlist = jobs
+      .map((job) => {
+        const normalizedLocation = job.location || (job.is_remote ? "Remote" : "");
+        const insight = computeMatchInsight({
+          jobDescription: [job.title, normalizedLocation, job.description].filter(Boolean).join(" "),
+          resumeText: profileContext.resumeText,
+          profileContextText: [profileContext.profileContextText, searchContext.note]
+            .filter(Boolean)
+            .join("\n\n"),
+          profileKeywords: discoveryKeywords,
+          jobTitle: job.title,
+          roleTypes: searchContext.roleTypes,
+          jobLocation: normalizedLocation,
+          preferredLocations: searchContext.locations,
+          remotePreference,
+        });
 
-      if (archiveError) {
-        throw new Error(archiveError.message);
-      }
-    }
+        return {
+          job,
+          normalizedLocation,
+          insight,
+          apiKey: buildApiDedupeKey(job.api_source, job.api_job_id),
+        };
+      })
+      .filter((item) => item.insight.score >= minScore);
+
+    const afterThresholdCount = shortlist.length;
+    const seenApiKeys = new Set(shortlist.map((item) => item.apiKey));
 
     let insertedCount = 0;
     let updatedCount = 0;
     let reactivatedCount = 0;
-    let activeCount = 0;
-    let afterThresholdCount = 0;
+    let archivedCount = 0;
+    let currentRunActiveCount = 0;
 
-    for (const job of jobs) {
-      const normalizedLocation = job.location || (job.is_remote ? "Remote" : "");
-      const insight = computeMatchInsight({
-        jobDescription: [job.title, normalizedLocation, job.description].filter(Boolean).join(" "),
-        resumeText: profileContext.resumeText,
-        profileContextText: [profileContext.profileContextText, searchContext.note]
-          .filter(Boolean)
-          .join("\n\n"),
-        profileKeywords: discoveryKeywords,
-        jobTitle: job.title,
-        roleTypes: searchContext.roleTypes,
-        jobLocation: normalizedLocation,
-        preferredLocations: searchContext.locations,
-        remotePreference,
-      });
+    for (const existing of existingOpportunities) {
+      if (
+        existing.status !== "new" ||
+        existing.application_id ||
+        !existing.api_source ||
+        !existing.api_job_id
+      ) {
+        continue;
+      }
 
-      if (insight.score < minScore) continue;
-      afterThresholdCount += 1;
+      const apiKey = buildApiDedupeKey(existing.api_source, existing.api_job_id);
+      if (seenApiKeys.has(apiKey)) continue;
 
-      const apiKey = buildApiDedupeKey(job.api_source, job.api_job_id);
+      const nextMissedRuns = (existing.discovery_missed_runs ?? 0) + 1;
+      const shouldArchive = nextMissedRuns >= STALE_DISCOVERY_MISS_LIMIT;
+      const payload = shouldArchive
+        ? {
+            status: "archived",
+            discovery_is_stale: true,
+            discovery_missed_runs: nextMissedRuns,
+            updated_at: runTimestamp,
+          }
+        : {
+            discovery_is_stale: true,
+            discovery_missed_runs: nextMissedRuns,
+            updated_at: runTimestamp,
+          };
+
+      const { error: staleError } = await supabase
+        .from("opportunities")
+        .update(payload)
+        .eq("id", existing.id)
+        .eq("user_id", userId);
+
+      if (staleError) {
+        console.error("discovery stale update", staleError);
+        continue;
+      }
+
+      if (shouldArchive) {
+        archivedCount += 1;
+        finalActiveKeys.delete(apiKey);
+      } else {
+        finalActiveKeys.add(apiKey);
+      }
+    }
+
+    for (const item of shortlist) {
+      const { job, normalizedLocation, insight, apiKey } = item;
       const existing = existingByKey.get(apiKey);
       const board = inferBoardFromUrl(job.job_url);
       const nextStatus =
         existing?.status === "saved" || existing?.status === "applied" ? existing.status : "new";
-      if (nextStatus === "new") {
-        activeCount += 1;
-      }
       const payload = {
         company: job.company,
         role: job.title,
@@ -402,8 +438,11 @@ export async function runDiscoveryForUser(
         api_source: job.api_source,
         api_job_id: job.api_job_id,
         discovery_run_id: runId,
-        ai_score: {},
+        ai_score: existing?.ai_score ?? {},
         posted_at: job.posted_at,
+        discovery_last_seen_at: runTimestamp,
+        discovery_missed_runs: 0,
+        discovery_is_stale: false,
         updated_at: runTimestamp,
       };
 
@@ -423,6 +462,13 @@ export async function runDiscoveryForUser(
           continue;
         }
 
+        if (nextStatus === "new") {
+          currentRunActiveCount += 1;
+          finalActiveKeys.add(apiKey);
+        } else {
+          finalActiveKeys.delete(apiKey);
+        }
+
         updatedCount += 1;
         continue;
       }
@@ -438,20 +484,23 @@ export async function runDiscoveryForUser(
         continue;
       }
 
+      currentRunActiveCount += 1;
+      finalActiveKeys.add(apiKey);
       insertedCount += 1;
     }
 
+    const activeCount = finalActiveKeys.size;
     const outcome = classifyDiscoveryReasonCode({
-        sourceErrors,
-        fetched: fetchStageCounts.fetched,
-        afterRemote: fetchStageCounts.afterRemote,
-        afterLocation: fetchStageCounts.afterLocation,
-        afterSeniority: fetchStageCounts.afterSeniority,
-        afterThreshold: afterThresholdCount,
-        active: activeCount,
-        updated: updatedCount,
-        reactivated: reactivatedCount,
-      });
+      sourceErrors,
+      fetched: fetchStageCounts.fetched,
+      afterRemote: fetchStageCounts.afterRemote,
+      afterLocation: fetchStageCounts.afterLocation,
+      afterSeniority: fetchStageCounts.afterSeniority,
+      afterThreshold: afterThresholdCount,
+      active: currentRunActiveCount,
+      updated: updatedCount,
+      reactivated: reactivatedCount,
+    });
 
     const diagnostics: DiscoveryRunDiagnostics = {
       reasonCode: outcome.reasonCode,
@@ -474,12 +523,13 @@ export async function runDiscoveryForUser(
         afterLocation: fetchStageCounts.afterLocation,
         afterSeniority: fetchStageCounts.afterSeniority,
         afterThreshold: afterThresholdCount,
-        active: activeCount,
+        active: currentRunActiveCount,
         inserted: insertedCount,
         updated: updatedCount,
         reactivated: reactivatedCount,
       },
       sourceStats,
+      sourceAvailability,
     };
 
     await supabase
@@ -494,6 +544,7 @@ export async function runDiscoveryForUser(
           source_query_locations: executedSourceQueryLocations,
           executed_context: diagnostics.executedContext,
           source_stats: sourceStats,
+          source_availability: sourceAvailability,
         },
       })
       .eq("id", runId);

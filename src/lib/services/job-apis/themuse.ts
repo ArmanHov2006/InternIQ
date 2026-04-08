@@ -2,38 +2,18 @@ import type { NormalizedJob } from "./types";
 
 const MUSE_BASE = "https://www.themuse.com/api/public/jobs";
 
-export const fetchTheMuseJobs = async (input: {
-  keywords: string[];
-  page?: number;
-  signal?: AbortSignal;
-}): Promise<NormalizedJob[]> => {
-  const apiKey = process.env.THEMUSE_API_KEY;
-  if (!apiKey) {
-    throw new Error("The Muse API key not configured");
-  }
+type MuseJob = {
+  id?: number;
+  name?: string;
+  company?: { name?: string };
+  locations?: Array<{ name?: string }>;
+  contents?: string;
+  refs?: { landing_page?: string };
+  publication_date?: string;
+};
 
-  const page = input.page ?? 1;
-  const category = "all";
-  const url = `${MUSE_BASE}?page=${page}&api_key=${encodeURIComponent(apiKey)}&category=${category}`;
-  const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
-  if (!res.ok) {
-    throw new Error(`The Muse HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as {
-    results?: Array<{
-      id?: number;
-      name?: string;
-      company?: { name?: string };
-      locations?: Array<{ name?: string }>;
-      contents?: string;
-      refs?: { landing_page?: string };
-      publication_date?: string;
-      type?: string;
-    }>;
-  };
-
-  const results = data.results ?? [];
-  const keywordNeedle = input.keywords.map((k) => k.toLowerCase()).filter(Boolean);
+const normalizeBatch = (results: MuseJob[], keywords: string[]): NormalizedJob[] => {
+  const keywordNeedle = keywords.map((k) => k.toLowerCase()).filter(Boolean);
   const out: NormalizedJob[] = [];
 
   for (const r of results) {
@@ -57,6 +37,43 @@ export const fetchTheMuseJobs = async (input: {
       is_remote: /\bremote\b/i.test(`${title} ${desc} ${locs}`),
       posted_at: r.publication_date ? new Date(r.publication_date).toISOString() : null,
     });
+  }
+
+  return out;
+};
+
+export const fetchTheMuseJobs = async (input: {
+  keywords: string[];
+  pageCount?: number;
+  signal?: AbortSignal;
+}): Promise<NormalizedJob[]> => {
+  const apiKey = process.env.THEMUSE_API_KEY;
+  if (!apiKey) {
+    throw new Error("The Muse API key not configured");
+  }
+
+  const pageCount = Math.max(1, Math.min(input.pageCount ?? 1, 3));
+  const category = "all";
+  const settled = await Promise.allSettled(
+    Array.from({ length: pageCount }, async (_, index) => {
+      const page = index + 1;
+      const url = `${MUSE_BASE}?page=${page}&api_key=${encodeURIComponent(apiKey)}&category=${category}`;
+      const res = await fetch(url, { next: { revalidate: 0 }, signal: input.signal });
+      if (!res.ok) {
+        throw new Error(`The Muse HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { results?: MuseJob[] };
+      return normalizeBatch(data.results ?? [], input.keywords);
+    })
+  );
+
+  const out: NormalizedJob[] = [];
+  for (const result of settled) {
+    if (result.status === "fulfilled") {
+      out.push(...result.value);
+      continue;
+    }
+    throw result.reason;
   }
 
   return out;

@@ -5,6 +5,7 @@ import type {
   DiscoveryPreferences,
   DiscoveryResumeContextOverrides,
   DiscoveryRunDiagnostics,
+  DiscoverySourceAvailability,
   Opportunity,
 } from "@/types/database";
 import { getDiscoveryPrimaryScore } from "@/lib/services/discovery/ai-scorer";
@@ -22,6 +23,7 @@ export type DiscoveryRunSummary = {
   newOpportunitiesCount: number;
   sourceErrors?: Record<string, string>;
   diagnostics?: DiscoveryRunDiagnostics;
+  sourceAvailability?: Record<string, DiscoverySourceAvailability>;
 };
 
 type DiscoveryRunResponse = Partial<DiscoveryRunSummary> & {
@@ -54,6 +56,10 @@ interface DiscoverState {
   fetchPreferences: () => Promise<void>;
   fetchOpportunities: () => Promise<void>;
   runDiscovery: () => Promise<DiscoveryRunResponse>;
+  scoreDiscoveryRun: (runId?: string, opportunityIds?: string[]) => Promise<{
+    scored: number;
+    candidates: number;
+  }>;
   autoFillFromResume: () => Promise<{
     error?: string;
     overrides?: DiscoveryResumeContextOverrides;
@@ -105,7 +111,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
   fetchOpportunities: async () => {
     set({ loading: true });
     try {
-      const res = await fetch("/api/opportunities?discovery_scope=latest_shortlist", {
+      const res = await fetch("/api/opportunities?discovery_scope=active_discovered", {
         credentials: "same-origin",
       });
       if (!res.ok) return;
@@ -144,6 +150,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
         resultsCount?: number;
         newOpportunitiesCount?: number;
         diagnostics?: DiscoveryRunDiagnostics;
+        sourceAvailability?: Record<string, DiscoverySourceAvailability>;
       };
       if (!res.ok) {
         return { error: payload.error ?? "Discovery failed", sourceErrors: payload.sourceErrors };
@@ -162,8 +169,10 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
             newOpportunitiesCount: payload.newOpportunitiesCount ?? 0,
             sourceErrors: payload.sourceErrors,
             diagnostics: payload.diagnostics,
+            sourceAvailability: payload.sourceAvailability ?? payload.diagnostics?.sourceAvailability,
           },
         });
+        void get().scoreDiscoveryRun(payload.runId);
       }
       return {
         runId: payload.runId,
@@ -174,6 +183,7 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
         reactivatedCount: payload.reactivatedCount,
         sourceErrors: payload.sourceErrors,
         diagnostics: payload.diagnostics,
+        sourceAvailability: payload.sourceAvailability ?? payload.diagnostics?.sourceAvailability,
         resultsCount: payload.reviewedCount ?? payload.resultsCount,
         newOpportunitiesCount: payload.newOpportunitiesCount,
       };
@@ -181,6 +191,57 @@ export const useDiscoverStore = create<DiscoverState>((set, get) => ({
       return { error: "Network error" };
     } finally {
       set({ running: false });
+    }
+  },
+
+  scoreDiscoveryRun: async (runId, opportunityIds) => {
+    const resolvedRunId = runId ?? get().latestRunSummary?.runId;
+    if (!resolvedRunId) {
+      return { scored: 0, candidates: 0 };
+    }
+
+    set({ scoring: true });
+    let totalScored = 0;
+    let candidates = 0;
+
+    try {
+      for (let batch = 0; batch < 10; batch += 1) {
+        const res = await fetch("/api/discovery/score", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            runId: resolvedRunId,
+            opportunity_ids: opportunityIds,
+            limit: 10,
+          }),
+        });
+        const payload = (await res.json()) as {
+          error?: string;
+          scored?: number;
+          candidates?: number;
+          remaining?: number;
+          done?: boolean;
+        };
+        if (!res.ok) {
+          throw new Error(payload.error ?? "Scoring failed");
+        }
+
+        totalScored += payload.scored ?? 0;
+        candidates = Math.max(candidates, payload.candidates ?? 0);
+
+        if ((payload.scored ?? 0) > 0) {
+          await get().fetchOpportunities();
+        }
+
+        if (payload.done || (payload.remaining ?? 0) <= 0 || (payload.candidates ?? 0) === 0) {
+          break;
+        }
+      }
+
+      return { scored: totalScored, candidates };
+    } finally {
+      set({ scoring: false });
     }
   },
 
@@ -245,6 +306,8 @@ export const selectFilteredOpportunities = (
   void filter;
   const rows = opportunities.filter((opportunity) => opportunity.status === "new");
   rows.sort((a, b) => {
+    const staleDelta = Number(Boolean(a.discovery_is_stale)) - Number(Boolean(b.discovery_is_stale));
+    if (staleDelta !== 0) return staleDelta;
     if (sort === "match") {
       return (getDiscoveryPrimaryScore(b) ?? 0) - (getDiscoveryPrimaryScore(a) ?? 0);
     }

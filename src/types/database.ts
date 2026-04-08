@@ -140,6 +140,9 @@ export interface Opportunity {
   discovery_run_id?: string | null;
   ai_score?: Record<string, unknown> | null;
   posted_at?: string | null;
+  discovery_last_seen_at?: string | null;
+  discovery_missed_runs?: number;
+  discovery_is_stale?: boolean;
 }
 
 export type RemotePreference = "any" | "remote_only" | "hybrid" | "onsite";
@@ -158,6 +161,16 @@ export interface DiscoverySourceStat {
   durationMs: number;
   timedOut: boolean;
   error: string | null;
+  limited?: boolean;
+  note?: string | null;
+}
+
+export interface DiscoverySourceAvailability {
+  enabled: boolean;
+  keyed: boolean;
+  paid: boolean;
+  requiresEnv: string[];
+  reason: string | null;
 }
 
 export interface DiscoveryRunDiagnostics {
@@ -187,6 +200,7 @@ export interface DiscoveryRunDiagnostics {
     reactivated: number;
   };
   sourceStats: Record<string, DiscoverySourceStat>;
+  sourceAvailability?: Record<string, DiscoverySourceAvailability>;
 }
 
 export interface DiscoveryResumeContextOverrides {

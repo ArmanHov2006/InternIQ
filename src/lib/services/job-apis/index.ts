@@ -8,6 +8,7 @@ import { fetchJoobleJobs } from "./jooble";
 import { fetchSearchApiJobs } from "./searchapi";
 import { fetchTheMuseJobs } from "./themuse";
 import { fetchUsajobsJobs } from "./usajobs";
+import { buildDiscoverySourceAvailability, isDiscoverySourceEnabled } from "./source-registry";
 import { hasEntryLevelRoleTypes, isEntryLevelSeniorityMismatch } from "@/lib/services/career-os";
 import type {
   DiscoveryFetchInput,
@@ -22,6 +23,8 @@ export type {
   DiscoveryFetchInput,
   DiscoveryFetchResult,
   DiscoveryFetchStageCounts,
+  DiscoverySourceAvailability,
+  JobApiSource,
   NormalizedJob,
   RemotePreference,
   SourceFetchResult,
@@ -40,6 +43,8 @@ type SourceExecutionResult = {
   jobs: NormalizedJob[];
   error?: string;
   timedOut?: boolean;
+  limited?: boolean;
+  note?: string;
 };
 
 export const normalizeCompanyName = (value: string): string =>
@@ -88,11 +93,6 @@ const passesExcluded = (job: NormalizedJob, excluded: string[]): boolean => {
 const normalizeLocationTerm = (loc: string): string =>
   loc.toLowerCase().replace(/[,.\s]+/g, " ").trim();
 
-/**
- * Post-fetch location filter. If the user specified locations, a job must match
- * at least one. "Remote" in the user's list lets any remote job through.
- * If no locations are specified, everything passes.
- */
 const passesLocationFilter = (
   job: NormalizedJob,
   userLocations: string[],
@@ -111,21 +111,15 @@ const passesLocationFilter = (
   if (!jobLoc) return userLocations.length === 0 || hasRemote;
 
   return userLocations.some((userLoc) => {
-    if (/^remote$/i.test(userLoc.trim())) return false; // already handled above
+    if (/^remote$/i.test(userLoc.trim())) return false;
     const needle = normalizeLocationTerm(userLoc);
     if (!needle) return false;
-    // Check if any word from the user location appears in the job location
-    // e.g. "Toronto" matches "Toronto, ON, Canada"
     return needle.split(/\s+/).some((word) => word.length >= 3 && jobLoc.includes(word));
   });
 };
 
 const EXPERIENCE_YEARS_REGEX = /\b(\d+)\+?\s*(?:years?|yrs?)\s*(?:of\s+)?(?:experience|exp\.?)\b/i;
 
-/**
- * Enhanced seniority filter: blocks explicit senior/exec titles AND
- * jobs requiring 4+ years of experience when searching for entry-level.
- */
 export const filterJobsByRoleTypeSeniority = (
   jobs: NormalizedJob[],
   roleTypes: string[]
@@ -133,10 +127,8 @@ export const filterJobsByRoleTypeSeniority = (
   if (!hasEntryLevelRoleTypes(roleTypes)) return jobs;
 
   return jobs.filter((job) => {
-    // Block explicit senior/executive titles
     if (isEntryLevelSeniorityMismatch(job.title, roleTypes)) return false;
 
-    // Block jobs requiring 4+ years of experience
     const match = EXPERIENCE_YEARS_REGEX.exec(job.description);
     if (match) {
       const years = parseInt(match[1]!, 10);
@@ -250,6 +242,8 @@ const executeSource = async (
       durationMs: Date.now() - startedAt,
       timedOut: Boolean(result.timedOut),
       error: result.error,
+      limited: result.limited,
+      note: result.note,
     };
   } catch (error) {
     return {
@@ -301,10 +295,7 @@ const runLocationAwareSource = (
       }
 
       timedOut = timedOut || isAbortError(result.reason);
-
-      queryErrors.push(
-        `${label}: ${formatSourceError(source, result.reason, timeoutMs)}`
-      );
+      queryErrors.push(`${label}: ${formatSourceError(source, result.reason, timeoutMs)}`);
     });
 
     return {
@@ -353,66 +344,115 @@ export async function fetchAllDiscoveryJobs(
     input.sourceQueryLocations && input.sourceQueryLocations.length > 0
       ? uniqueNonEmpty(input.sourceQueryLocations)
       : buildSourceQueryLocations(locationQuerySpecs);
+  const sourceAvailability = buildDiscoverySourceAvailability();
 
-  const tasks: Promise<SourceFetchResult>[] = [
-    executeSource("adzuna", timeoutMs, runLocationAwareSource("adzuna", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
-      fetchAdzunaJobs({
-        keywords: input.keywords,
-        locations,
-        roleTypes: input.roleTypes,
-        maxPages: input.adzunaMaxPages ?? 2,
-        remoteQuery,
-        signal,
-      })
-    )),
-    executeSource("greenhouse", timeoutMs, async (signal) => {
-      const { jobs, errors } = await fetchGreenhouseJobs(
-        input.greenhouseSlugs,
-        GREENHOUSE_MAX_SLUGS,
-        signal
-      );
-      return {
-        jobs,
-        error:
-          Object.keys(errors).length > 0
-            ? Object.entries(errors)
-                .map(([slug, message]) => `${slug}: ${message}`)
-                .join("; ")
-            : undefined,
-      };
-    }),
-    executeSource("himalayas", timeoutMs, async (signal) => ({
-      jobs: await fetchHimalayasJobs({
-        keywords: input.keywords,
-        roleTypes: input.roleTypes,
-        signal,
-      }),
-    })),
-    executeSource("jobicy", timeoutMs, async (signal) => ({
-      jobs: await fetchJobicyJobs({
-        keywords: input.keywords,
-        roleTypes: input.roleTypes,
-        signal,
-      }),
-    })),
-    executeSource("remoteok", timeoutMs, async (signal) => ({
-      jobs: await fetchRemoteOKJobs({
-        keywords: input.keywords,
-        roleTypes: input.roleTypes,
-        signal,
-      }),
-    })),
-  ];
+  const tasks: Promise<SourceFetchResult>[] = [];
 
-  if (process.env.THEMUSE_API_KEY?.trim()) {
+  if (isDiscoverySourceEnabled(sourceAvailability, "adzuna")) {
     tasks.push(
-      executeSource("themuse", timeoutMs, async (signal) => ({
-        jobs: await fetchTheMuseJobs({ keywords: input.keywords, page: 1, signal }),
+      executeSource(
+        "adzuna",
+        timeoutMs,
+        runLocationAwareSource("adzuna", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchAdzunaJobs({
+            keywords: input.keywords,
+            locations,
+            roleTypes: input.roleTypes,
+            maxPages: input.adzunaMaxPages ?? 4,
+            remoteQuery,
+            signal,
+          })
+        )
+      )
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "greenhouse")) {
+    tasks.push(
+      executeSource("greenhouse", timeoutMs, async (signal) => {
+        const { jobs, errors, timedOut } = await fetchGreenhouseJobs(
+          input.greenhouseSlugs,
+          GREENHOUSE_MAX_SLUGS,
+          signal
+        );
+        return {
+          jobs,
+          timedOut,
+          error:
+            Object.keys(errors).length > 0
+              ? Object.entries(errors)
+                  .map(([slug, message]) => `${slug}: ${message}`)
+                  .join("; ")
+              : undefined,
+        };
+      })
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "himalayas")) {
+    tasks.push(
+      executeSource("himalayas", timeoutMs, async (signal) => ({
+        jobs: await fetchHimalayasJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+          offsets: [0, 20, 40],
+          signal,
+        }),
       }))
     );
   }
 
-  if (process.env.JSEARCH_API_KEY?.trim()) {
+  if (isDiscoverySourceEnabled(sourceAvailability, "jobicy")) {
+    tasks.push(
+      executeSource("jobicy", timeoutMs, async (signal) => {
+        try {
+          return {
+            jobs: await fetchJobicyJobs({
+              keywords: input.keywords,
+              roleTypes: input.roleTypes,
+              count: 50,
+              signal,
+            }),
+          };
+        } catch (error) {
+          if (isAbortError(error)) throw error;
+          const jobs = await fetchJobicyJobs({
+            keywords: input.keywords,
+            roleTypes: input.roleTypes,
+            count: 20,
+            signal,
+          });
+          return {
+            jobs,
+            limited: true,
+            note: "Jobicy fell back to 20 results.",
+          };
+        }
+      })
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "remoteok")) {
+    tasks.push(
+      executeSource("remoteok", timeoutMs, async (signal) => ({
+        jobs: await fetchRemoteOKJobs({
+          keywords: input.keywords,
+          roleTypes: input.roleTypes,
+          signal,
+        }),
+      }))
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "themuse")) {
+    tasks.push(
+      executeSource("themuse", timeoutMs, async (signal) => ({
+        jobs: await fetchTheMuseJobs({ keywords: input.keywords, pageCount: 3, signal }),
+      }))
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "jsearch")) {
     tasks.push(
       executeSource(
         "jsearch",
@@ -430,7 +470,7 @@ export async function fetchAllDiscoveryJobs(
     );
   }
 
-  if (process.env.JOOBLE_API_KEY?.trim()) {
+  if (isDiscoverySourceEnabled(sourceAvailability, "jooble")) {
     tasks.push(
       executeSource(
         "jooble",
@@ -448,7 +488,7 @@ export async function fetchAllDiscoveryJobs(
     );
   }
 
-  if (process.env.USAJOBS_API_KEY?.trim()) {
+  if (isDiscoverySourceEnabled(sourceAvailability, "usajobs")) {
     tasks.push(
       executeSource(
         "usajobs",
@@ -466,7 +506,7 @@ export async function fetchAllDiscoveryJobs(
     );
   }
 
-  if (process.env.SEARCHAPI_API_KEY?.trim()) {
+  if (isDiscoverySourceEnabled(sourceAvailability, "searchapi")) {
     tasks.push(
       executeSource(
         "searchapi",
@@ -497,6 +537,8 @@ export async function fetchAllDiscoveryJobs(
       durationMs: result.durationMs,
       timedOut: result.timedOut,
       error: result.error ?? null,
+      limited: result.limited,
+      note: result.note ?? null,
     };
     combined.push(...result.jobs);
   }
@@ -504,5 +546,12 @@ export async function fetchAllDiscoveryJobs(
   const included = combined.filter((job) => passesExcluded(job, input.excludedCompanies));
   const { jobs, stageCounts } = filterDiscoveryJobs(included, input);
 
-  return { jobs, sourceErrors, sourceStats, sourceQueryLocations, stageCounts };
+  return {
+    jobs,
+    sourceErrors,
+    sourceStats,
+    sourceAvailability,
+    sourceQueryLocations,
+    stageCounts,
+  };
 }

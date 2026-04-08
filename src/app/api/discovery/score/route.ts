@@ -33,21 +33,34 @@ export async function POST(request: Request) {
     ? (body.opportunity_ids as unknown[]).map(String).filter(Boolean)
     : null;
   const runId = typeof body.runId === "string" && body.runId.trim() ? body.runId.trim() : undefined;
+  const requestedLimit =
+    typeof body.limit === "number" && Number.isFinite(body.limit)
+      ? Math.max(1, Math.min(20, Math.round(body.limit)))
+      : 10;
 
   try {
     const result = await scoreDiscoveryShortlistForUser(supabase, user.id, {
       runId,
       opportunityIds: explicitIds ?? undefined,
-      limit: 15,
+      limit: requestedLimit,
     });
 
     if (result.candidates === 0) {
-      return NextResponse.json({ scored: 0, message: "No eligible jobs.", runId: result.runId });
+      return NextResponse.json({
+        scored: 0,
+        candidates: 0,
+        remaining: 0,
+        done: true,
+        message: "No eligible jobs.",
+        runId: result.runId,
+      });
     }
 
     return NextResponse.json({
       scored: result.scored,
       candidates: result.candidates,
+      remaining: result.remaining,
+      done: result.done,
       runId: result.runId,
     });
   } catch (error) {

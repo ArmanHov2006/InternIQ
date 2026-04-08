@@ -221,6 +221,11 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
                   {opportunity.api_source}
                 </Badge>
               ) : null}
+              {opportunity.discovery_is_stale ? (
+                <Badge variant="outline" className="text-[10px]">
+                  Stale
+                </Badge>
+              ) : null}
               <div className={cn("min-w-[68px] rounded-xl px-2.5 py-2 text-center", colors.bg)}>
                 <p className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
                   Fit
@@ -254,6 +259,11 @@ export const JobCard = ({ opportunity }: JobCardProps) => {
                   Retrieval score while AI rerank is unavailable
                 </span>
               )}
+              {opportunity.discovery_is_stale ? (
+                <span className="text-[11px] text-amber-500">
+                  Not seen in the latest run yet
+                </span>
+              ) : null}
             </div>
             <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
               <div

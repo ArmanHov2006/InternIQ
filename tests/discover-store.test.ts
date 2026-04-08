@@ -28,6 +28,9 @@ const makeOpportunity = (overrides: Partial<Opportunity>): Opportunity => ({
   discovery_run_id: overrides.discovery_run_id ?? "run-1",
   ai_score: overrides.ai_score ?? {},
   posted_at: overrides.posted_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_last_seen_at: overrides.discovery_last_seen_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_missed_runs: overrides.discovery_missed_runs ?? 0,
+  discovery_is_stale: overrides.discovery_is_stale ?? false,
 });
 
 describe("selectFilteredOpportunities", () => {
@@ -83,5 +86,17 @@ describe("selectFilteredOpportunities", () => {
     const shortlist = selectFilteredOpportunities(rows, "all", "match");
 
     expect(shortlist.map((row) => row.id)).toEqual(["new"]);
+  });
+
+  it("keeps stale discovery rows visible but sorts fresh rows first", () => {
+    const rows = [
+      makeOpportunity({ id: "stale-best", match_score: 99, discovery_is_stale: true }),
+      makeOpportunity({ id: "fresh-good", match_score: 82, discovery_is_stale: false }),
+      makeOpportunity({ id: "fresh-mid", match_score: 75, discovery_is_stale: false }),
+    ];
+
+    const shortlist = selectFilteredOpportunities(rows, "all", "match");
+
+    expect(shortlist.map((row) => row.id)).toEqual(["fresh-good", "fresh-mid", "stale-best"]);
   });
 });

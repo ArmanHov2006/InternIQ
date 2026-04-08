@@ -27,8 +27,8 @@ export const JobFeed = () => {
   const sort = useDiscoverStore((s) => s.sort);
   const setSort = useDiscoverStore((s) => s.setSort);
   const scoring = useDiscoverStore((s) => s.scoring);
-  const setScoring = useDiscoverStore((s) => s.setScoring);
   const fetchOpportunities = useDiscoverStore((s) => s.fetchOpportunities);
+  const scoreDiscoveryRun = useDiscoverStore((s) => s.scoreDiscoveryRun);
   const latestRunSummary = useDiscoverStore((s) => s.latestRunSummary);
   const selectedIds = useDiscoverStore((s) => s.selectedIds);
   const clearSelection = useDiscoverStore((s) => s.clearSelection);
@@ -45,28 +45,14 @@ export const JobFeed = () => {
   });
 
   const onAiScore = async () => {
-    setScoring(true);
     try {
-      const res = await fetch("/api/discovery/score", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ runId: latestRunSummary?.runId }),
-      });
-      const payload = (await res.json()) as {
-        error?: string;
-        scored?: number;
-        candidates?: number;
-      };
-      if (!res.ok) throw new Error(payload.error ?? "Scoring failed");
+      const payload = await scoreDiscoveryRun(latestRunSummary?.runId);
       toast.success(
         `Re-scored ${payload.scored ?? 0} of ${payload.candidates ?? payload.scored ?? 0} shortlist job(s).`
       );
       await fetchOpportunities();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Scoring failed.");
-    } finally {
-      setScoring(false);
     }
   };
 
@@ -116,7 +102,7 @@ export const JobFeed = () => {
       {/* Controls bar */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="text-xs text-muted-foreground">
-          Current shortlist{" "}
+          Active discovered jobs{" "}
           <span className="ml-1 font-mono text-[11px] text-foreground">{rows.length}</span>
         </div>
 

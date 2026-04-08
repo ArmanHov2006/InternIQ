@@ -59,7 +59,15 @@ export async function GET(request: Request) {
           ? demoRows.filter(
               (row) => row.source === "recommendation" && row.status === "new" && row.api_source && row.api_job_id
             )
-          : demoRows;
+          : discoveryScope === "active_discovered"
+            ? demoRows.filter(
+                (row) =>
+                  row.source === "recommendation" &&
+                  row.status === "new" &&
+                  row.api_source &&
+                  row.api_job_id
+              )
+            : demoRows;
       return NextResponse.json(filtered.sort((a, b) => (b.match_score ?? 0) - (a.match_score ?? 0)));
     }
 
@@ -97,6 +105,29 @@ export async function GET(request: Request) {
         .eq("discovery_run_id", latestRunId)
         .not("api_source", "is", null)
         .order("match_score", { ascending: false, nullsFirst: false })
+        .order("updated_at", { ascending: false });
+
+      if (error) {
+        if (isSchemaCompatError(error)) {
+          return NextResponse.json([]);
+        }
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+
+      return NextResponse.json((data ?? []) as Opportunity[]);
+    }
+
+    if (discoveryScope === "active_discovered") {
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select("*")
+        .eq("user_id", user.id)
+        .eq("source", "recommendation")
+        .eq("status", "new")
+        .not("api_source", "is", null)
+        .order("discovery_is_stale", { ascending: true, nullsFirst: true })
+        .order("match_score", { ascending: false, nullsFirst: false })
+        .order("posted_at", { ascending: false, nullsFirst: false })
         .order("updated_at", { ascending: false });
 
       if (error) {

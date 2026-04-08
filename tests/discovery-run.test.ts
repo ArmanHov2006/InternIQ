@@ -8,6 +8,8 @@ import {
 import {
   fetchAllDiscoveryJobs,
   type DiscoveryFetchResult,
+  type DiscoverySourceAvailability,
+  type JobApiSource,
   type NormalizedJob,
 } from "@/lib/services/job-apis";
 import type { Opportunity } from "@/types/database";
@@ -242,6 +244,19 @@ const seniorDevOpsJob: NormalizedJob = {
   posted_at: "2026-04-06T14:30:00.000Z",
 };
 
+const defaultSourceAvailability: Record<JobApiSource, DiscoverySourceAvailability> = {
+  adzuna: { enabled: true, keyed: true, paid: true, requiresEnv: ["ADZUNA_APP_ID", "ADZUNA_APP_KEY"], reason: null },
+  greenhouse: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
+  themuse: { enabled: false, keyed: true, paid: true, requiresEnv: ["THEMUSE_API_KEY"], reason: "Missing THEMUSE_API_KEY" },
+  jsearch: { enabled: false, keyed: true, paid: true, requiresEnv: ["JSEARCH_API_KEY"], reason: "Missing JSEARCH_API_KEY" },
+  himalayas: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
+  jobicy: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
+  remoteok: { enabled: true, keyed: false, paid: false, requiresEnv: [], reason: null },
+  jooble: { enabled: false, keyed: true, paid: true, requiresEnv: ["JOOBLE_API_KEY"], reason: "Missing JOOBLE_API_KEY" },
+  usajobs: { enabled: false, keyed: true, paid: false, requiresEnv: ["USAJOBS_API_KEY", "USAJOBS_EMAIL"], reason: "Missing USAJOBS_API_KEY, USAJOBS_EMAIL" },
+  searchapi: { enabled: false, keyed: true, paid: true, requiresEnv: ["SEARCHAPI_API_KEY"], reason: "Missing SEARCHAPI_API_KEY" },
+};
+
 const buildFetchResult = (
   jobs: NormalizedJob[],
   overrides: Partial<DiscoveryFetchResult> = {}
@@ -249,6 +264,7 @@ const buildFetchResult = (
   jobs,
   sourceErrors: overrides.sourceErrors ?? {},
   sourceStats: overrides.sourceStats ?? {},
+  sourceAvailability: overrides.sourceAvailability ?? defaultSourceAvailability,
   sourceQueryLocations: overrides.sourceQueryLocations ?? [],
   stageCounts: {
     fetched: jobs.length,
@@ -285,6 +301,9 @@ const existingOpportunity = (overrides: Partial<Opportunity>): Opportunity => ({
   discovery_run_id: overrides.discovery_run_id ?? "run-old",
   ai_score: overrides.ai_score ?? { final_score: 88 },
   posted_at: overrides.posted_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_last_seen_at: overrides.discovery_last_seen_at ?? "2026-04-05T10:00:00.000Z",
+  discovery_missed_runs: overrides.discovery_missed_runs ?? 0,
+  discovery_is_stale: overrides.discovery_is_stale ?? false,
 });
 
 describe("runDiscoveryForUser", () => {
@@ -504,7 +523,7 @@ describe("runDiscoveryForUser", () => {
     );
   });
 
-  it("archives prior unsaved matches and preserves saved jobs across reruns", async () => {
+  it("marks prior unsaved matches stale and preserves saved jobs across reruns", async () => {
     fetchAllDiscoveryJobsMock.mockResolvedValue(
       buildFetchResult([
         {
@@ -544,32 +563,50 @@ describe("runDiscoveryForUser", () => {
     const result = await runDiscoveryForUser(supabase, "user-1");
 
     expect(result).toMatchObject({
-      archivedCount: 1,
-      activeCount: 0,
+      archivedCount: 0,
+      activeCount: 1,
       newOpportunitiesCount: 0,
       updatedCount: 1,
       reactivatedCount: 0,
-      diagnostics: {
-        reasonCode: "all_refreshed",
-        stageCounts: {
-          fetched: 1,
-          afterRemote: 1,
-          afterLocation: 1,
-          afterSeniority: 1,
-          afterThreshold: 1,
-          active: 0,
-          inserted: 0,
-          updated: 1,
-          reactivated: 0,
-        },
-      },
     });
-    expect(opportunities.find((row) => row.id === "opp-old")?.status).toBe("archived");
+    expect(opportunities.find((row) => row.id === "opp-old")).toMatchObject({
+      status: "new",
+      discovery_is_stale: true,
+      discovery_missed_runs: 1,
+    });
     expect(opportunities.find((row) => row.id === "opp-saved")).toMatchObject({
       status: "saved",
       application_id: "app-1",
       discovery_run_id: "run-1",
-      ai_score: {},
+      ai_score: { final_score: 95 },
+    });
+  });
+
+  it("archives stale discovery rows after three missed runs", async () => {
+    fetchAllDiscoveryJobsMock.mockResolvedValue(buildFetchResult([]));
+    getDiscoveryProfileContextMock.mockResolvedValue({
+      resumeText: "Built Python FastAPI Redis Docker backend systems for LLM workflows.",
+      profileKeywords: ["python", "fastapi", "redis", "docker", "backend"],
+      profileContextText: "Backend engineer focused on Python FastAPI Redis Docker systems.",
+      profileLocation: "Toronto",
+    });
+
+    const stale = existingOpportunity({
+      id: "opp-stale",
+      api_job_id: "jobicy-old",
+      external_job_id: "jobicy-old",
+      discovery_missed_runs: 2,
+      discovery_is_stale: true,
+    });
+
+    const { supabase, opportunities } = createSupabaseStub(defaultPreferences, [stale]);
+    const result = await runDiscoveryForUser(supabase, "user-1");
+
+    expect(result.archivedCount).toBe(1);
+    expect(opportunities.find((row) => row.id === "opp-stale")).toMatchObject({
+      status: "archived",
+      discovery_missed_runs: 3,
+      discovery_is_stale: true,
     });
   });
 
@@ -603,7 +640,9 @@ describe("runDiscoveryForUser", () => {
       id: "opp-archived",
       status: "new",
       discovery_run_id: "run-1",
-      ai_score: {},
+      ai_score: { final_score: 91 },
+      discovery_missed_runs: 0,
+      discovery_is_stale: false,
     });
   });
 

@@ -60,6 +60,7 @@ export const PreferencesBar = ({ onOpenPrefs, onOpenAdvanced }: PreferencesBarPr
       reactivatedCount,
       newOpportunitiesCount,
       diagnostics,
+      sourceAvailability,
     } = await runDiscovery();
     if (error) {
       setRunFeedback({ tone: "error", message: error, details: [], sourceErrors });
@@ -84,6 +85,7 @@ export const PreferencesBar = ({ onOpenPrefs, onOpenAdvanced }: PreferencesBarPr
       updated,
       reactivated,
       sourceErrors,
+      sourceAvailability,
     });
     setRunFeedback(feedback);
     setLiveMessage(feedback.message);
