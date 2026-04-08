@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Briefcase, Plus, Sparkles } from "lucide-react";
+import { APPLICATION_STATUSES, STATUS_LABELS } from "@/lib/constants";
 import Link from "next/link";
 import { toast } from "sonner";
 import type { Application } from "@/types/database";
@@ -12,10 +13,18 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useKanbanStore } from "@/stores/kanban-store";
 
+const STATUS_TEXT_COLORS: Record<string, string> = {
+  saved: "text-orange-400",
+  applied: "text-orange-300",
+  interview: "text-amber-200",
+  offer: "text-green-400",
+  rejected: "text-red-400",
+};
+
 export default function PipelinePage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { cards, hydrateFromApplications, addOrUpdateFromApplication } = useKanbanStore();
+  const { cards, columns, hydrateFromApplications, addOrUpdateFromApplication } = useKanbanStore();
 
   useEffect(() => {
     const syncApplications = async () => {
@@ -57,6 +66,15 @@ export default function PipelinePage() {
 
   const cardCount = Object.keys(cards).length;
 
+  const statusCounts = useMemo(() => {
+    return APPLICATION_STATUSES.map((status) => ({
+      status,
+      label: STATUS_LABELS[status],
+      count: columns[status]?.cardIds.length ?? 0,
+      textColor: STATUS_TEXT_COLORS[status] ?? "text-muted-foreground",
+    }));
+  }, [columns]);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
@@ -71,6 +89,21 @@ export default function PipelinePage() {
           Add application
         </Button>
       </div>
+
+      {!loading && cardCount > 0 ? (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+          <span>
+            <span className="font-mono text-foreground">{cardCount}</span> Total
+          </span>
+          {statusCounts.map(({ status, label, count, textColor }) => (
+            <span key={status} className="flex items-center gap-0.5">
+              <span className="text-muted-foreground/40">|</span>
+              <span className={`ml-1 font-mono ${textColor}`}>{count}</span>
+              <span>{label}</span>
+            </span>
+          ))}
+        </div>
+      ) : null}
 
       {loading ? <KanbanSkeleton /> : null}
       {!loading && cardCount === 0 ? (

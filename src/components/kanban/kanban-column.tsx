@@ -62,6 +62,7 @@ export const KanbanColumn = memo(({ id, title, color, cards, isOver, activeCardI
                   location={card.location}
                   fitScore={card.fitScore}
                   aiCompletedCount={card.aiCompletedCount}
+                  hasMaterials={card.hasMaterials}
                   status={id}
                   dragging={activeCardId === card.id}
                   onClick={() => onSelectCard(card)}

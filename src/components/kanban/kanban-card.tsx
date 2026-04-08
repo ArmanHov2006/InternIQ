@@ -16,6 +16,7 @@ interface KanbanCardProps {
   location?: string;
   fitScore?: number;
   aiCompletedCount?: number;
+  hasMaterials?: boolean;
   onClick?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
@@ -33,6 +34,7 @@ interface KanbanCardFaceProps {
   location?: string;
   fitScore?: number;
   aiCompletedCount?: number;
+  hasMaterials?: boolean;
   onEdit?: () => void;
   onDelete?: () => void;
   compact?: boolean;
@@ -51,6 +53,7 @@ export const KanbanCardFace = memo(({
   location,
   fitScore,
   aiCompletedCount = 0,
+  hasMaterials = false,
   onEdit,
   onDelete,
   compact = false,
@@ -88,17 +91,31 @@ export const KanbanCardFace = memo(({
           </p>
         </div>
 
-        {typeof fitScore === "number" ? (
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/10 font-mono text-primary",
-              landingCompact ? "px-2 py-1 text-[11px]" : "px-2 py-0.5 text-xs"
-            )}
-          >
-            <Sparkles className="h-3 w-3" aria-hidden />
-            {fitScore}%
-          </span>
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {hasMaterials && typeof fitScore !== "number" ? (
+            <span
+              className="inline-flex shrink-0 items-center rounded-md border border-primary/20 bg-primary/5 px-1.5 py-0.5"
+              aria-label="AI materials ready"
+            >
+              <Sparkles className="h-3 w-3 text-primary/60" aria-hidden />
+            </span>
+          ) : null}
+          {typeof fitScore === "number" ? (
+            <span
+              className={cn(
+                "inline-flex shrink-0 items-center gap-1 rounded-md border border-primary/25 bg-primary/10 font-mono text-primary",
+                landingCompact ? "px-2 py-1 text-[11px]" : "px-2 py-0.5 text-xs"
+              )}
+            >
+              {hasMaterials ? (
+                <Sparkles className="h-3 w-3 text-primary/60" aria-hidden />
+              ) : (
+                <Sparkles className="h-3 w-3" aria-hidden />
+              )}
+              {fitScore}%
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {showMetadata ? (
@@ -172,6 +189,7 @@ export const KanbanCard = memo(({
   location,
   fitScore,
   aiCompletedCount,
+  hasMaterials,
   onClick,
   onEdit,
   onDelete,
@@ -253,6 +271,7 @@ export const KanbanCard = memo(({
           location={location}
           fitScore={fitScore}
           aiCompletedCount={aiCompletedCount}
+          hasMaterials={hasMaterials}
           onEdit={onEdit}
           onDelete={onDelete}
           compact={compact}

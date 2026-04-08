@@ -18,6 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
@@ -215,6 +223,8 @@ export function ApplicationDrawer({
   const [form, setForm] = useState<FormState | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [justSaved, setJustSaved] = useState(false);
   const [fitResult, setFitResult] = useState<AnalyzeResult | null>(null);
   const [draftAnswers, setDraftAnswers] = useState<string | null>(null);
   const [draftLoading, setDraftLoading] = useState(false);
@@ -342,6 +352,8 @@ export function ApplicationDrawer({
         "Could not update application."
       );
       toast.success("Saved.");
+      setJustSaved(true);
+      setTimeout(() => setJustSaved(false), 2000);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not save.");
     } finally {
@@ -351,7 +363,6 @@ export function ApplicationDrawer({
 
   const handleDelete = async () => {
     if (!application) return;
-    if (!window.confirm("Delete this application?")) return;
     setDeleting(true);
     try {
       const res = await fetch("/api/applications", {
@@ -363,6 +374,7 @@ export function ApplicationDrawer({
       const payload = (await res.json()) as { success?: boolean; error?: string };
       if (!res.ok || !payload.success) throw new Error(payload.error ?? "Could not delete.");
       onDeleted(application.id);
+      setDeleteDialogOpen(false);
       onOpenChange(false);
       toast.success("Deleted.");
     } catch (e) {
@@ -406,34 +418,34 @@ export function ApplicationDrawer({
         </SheetHeader>
 
         <Tabs defaultValue="ai" className="flex min-h-0 flex-1 flex-col">
-          <TabsList className="mx-0 mt-0 flex h-auto w-full justify-start gap-0 rounded-none border-b border-border bg-transparent p-0">
+          <TabsList className="mx-0 mt-0 flex h-auto w-full flex-nowrap justify-start gap-0 overflow-x-auto rounded-none border-b border-border bg-transparent p-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
             <TabsTrigger
               value="ai"
-              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="relative shrink-0 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none sm:flex-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               AI Actions
             </TabsTrigger>
             <TabsTrigger
               value="overview"
-              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="relative shrink-0 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none sm:flex-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger
               value="notes"
-              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="relative shrink-0 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none sm:flex-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Notes
             </TabsTrigger>
             <TabsTrigger
               value="timeline"
-              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="relative shrink-0 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none sm:flex-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Timeline
             </TabsTrigger>
             <TabsTrigger
               value="drafts"
-              className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
+              className="relative shrink-0 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground shadow-none sm:flex-1 data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
               Materials
             </TabsTrigger>
@@ -611,17 +623,17 @@ export function ApplicationDrawer({
                 </Button>
                 <Button type="button" size="sm" onClick={() => void handleSave()} disabled={saving || deleting}>
                   {saving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Save
+                  {justSaved ? <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-500" /> : null}
+                  {justSaved ? "Saved" : "Save"}
                 </Button>
                 <Button
                   type="button"
                   size="sm"
                   variant="destructive"
                   className="ml-auto"
-                  onClick={() => void handleDelete()}
+                  onClick={() => setDeleteDialogOpen(true)}
                   disabled={deleting || saving}
                 >
-                  {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                   Delete
                 </Button>
               </div>
@@ -741,6 +753,36 @@ export function ApplicationDrawer({
           </TabsContent>
         </Tabs>
       </SheetContent>
+
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete application?</DialogTitle>
+            <DialogDescription>
+              This will permanently remove {application.company} &mdash; {application.role} from your pipeline.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setDeleteDialogOpen(false)}
+              disabled={deleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleDelete()}
+              disabled={deleting}
+            >
+              {deleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

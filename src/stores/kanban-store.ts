@@ -20,6 +20,7 @@ export interface KanbanCardData {
   lastStatusChangeReason?: string;
   lastStatusChangeAt?: string;
   aiCompletedCount?: number;
+  hasMaterials?: boolean;
 }
 
 interface ColumnData {
@@ -71,6 +72,16 @@ const getAiCompletedCount = (application: Application): number => {
     if (typed.resumeTailor) count += 1;
   }
   return count;
+};
+
+const getHasMaterials = (application: Application): boolean => {
+  if (application.generated_email?.trim()) return true;
+  const meta = application.ai_metadata;
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const typed = meta as Record<string, unknown>;
+    if (typed.coverLetter) return true;
+  }
+  return false;
 };
 
 const columnsSeed: Record<StatusId, ColumnData> = {
@@ -140,6 +151,7 @@ export const useKanbanStore = create<KanbanState>()(
               lastStatusChangeReason: app.last_status_change_reason ?? "",
               lastStatusChangeAt: app.last_status_change_at ?? app.updated_at,
               aiCompletedCount: getAiCompletedCount(app),
+              hasMaterials: getHasMaterials(app),
             };
             const status = toSafeStatus(app.status);
             nextColumns[status].cardIds.push(app.id);
@@ -195,6 +207,7 @@ export const useKanbanStore = create<KanbanState>()(
                 lastStatusChangeReason: application.last_status_change_reason ?? "",
                 lastStatusChangeAt: application.last_status_change_at ?? application.updated_at,
                 aiCompletedCount: getAiCompletedCount(application),
+                hasMaterials: getHasMaterials(application),
               },
             },
           };
