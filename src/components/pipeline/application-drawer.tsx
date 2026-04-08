@@ -304,7 +304,7 @@ export function ApplicationDrawer({
           // Prevent Radix from auto-focusing the previously active card, which can yank the board scroll position.
           event.preventDefault();
         }}
-        overlayClassName="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        overlayClassName="fixed inset-0 z-50 bg-background/60 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         className="flex w-full flex-col overflow-hidden border-l border-border bg-drawer-surface p-0 shadow-none sm:max-w-2xl data-[state=closed]:duration-300 data-[state=open]:duration-500"
       >
         <SheetHeader className="border-b border-border px-6 py-4 text-left">

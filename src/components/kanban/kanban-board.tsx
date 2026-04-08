@@ -294,7 +294,7 @@ export const KanbanBoard = () => {
         particleCount: 18,
         spread: 50,
         origin: { x: (cardRect.left + cardRect.width / 2) / window.innerWidth, y: cardRect.top / window.innerHeight },
-        colors: [columns[to].color, "#FF8A50"],
+        colors: [columns[to].color, getComputedStyle(document.documentElement).getPropertyValue("--primary").trim()],
         startVelocity: 20,
         gravity: 0.8,
         ticks: 60,
@@ -436,7 +436,7 @@ export const KanbanBoard = () => {
               style={{ width: dragSize?.width, height: dragSize?.height }}
               className="shadow-glow-md"
               initial={{ scale: 0.98, opacity: 0.9 }}
-              animate={{ scale: 1.02, opacity: 1 }}
+              animate={{ scale: 1.02, opacity: 1, rotate: 1 }}
               transition={{ type: "spring", stiffness: 360, damping: 28 }}
             >
               <KanbanCardFace

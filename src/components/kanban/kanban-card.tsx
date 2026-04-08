@@ -75,13 +75,13 @@ export const KanbanCardFace = memo(({
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className={cn("truncate font-semibold text-foreground", landingCompact ? "text-sm" : "text-[13px]")}>
+          <p className="truncate text-sm font-semibold text-foreground">
             {company}
           </p>
           <p
             className={cn(
-              "min-w-0 text-muted-foreground",
-              landingCompact ? "line-clamp-1 text-[13px] font-medium" : "text-sm font-medium"
+              "min-w-0 text-sm font-medium text-muted-foreground",
+              landingCompact && "line-clamp-1"
             )}
           >
             {role}

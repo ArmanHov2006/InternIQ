@@ -175,7 +175,7 @@ export function FitScoreDisplay({ result, jobUrl, showSaveAction = true }: FitSc
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#FF6A2B] to-[#FF8A50] font-mono text-xl font-bold tabular-nums text-white shadow-[0_0_24px_rgba(255,106,43,0.15)]">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 font-mono text-xl font-bold tabular-nums text-white shadow-glow-xs">
             {normalizedScore}
           </div>
           <div className="min-w-0 flex-1 space-y-2">

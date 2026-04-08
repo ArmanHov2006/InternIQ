@@ -15,7 +15,7 @@ export const GlassCard = ({ children, className, glowColor }: GlassCardProps) =>
   return (
     <div
       className={cn(
-        "rounded-2xl border border-border bg-card text-card-foreground shadow-none transition-colors duration-100",
+        "rounded-lg border border-border bg-card text-card-foreground shadow-none transition-colors duration-100",
         "hover:border-primary/20",
         glowColor && "shadow-glow-sm",
         className

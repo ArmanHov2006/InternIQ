@@ -29,7 +29,7 @@ export const KanbanColumn = memo(({ id, title, color, cards, isOver, activeCardI
       role="list"
       aria-label={`${title} column`}
       className={cn(
-        "min-h-[420px] rounded-xl border border-border bg-muted/30 p-2 transition-colors duration-100 dark:bg-muted/10",
+        "min-h-[420px] rounded-xl border border-border bg-muted/30 p-3 transition-colors duration-100 dark:bg-muted/10",
         isDragging && "border-border",
         isOver && "border-primary/35 bg-muted/50 dark:bg-muted/20"
       )}
@@ -37,7 +37,7 @@ export const KanbanColumn = memo(({ id, title, color, cards, isOver, activeCardI
       <div className="mb-2 flex items-center justify-between gap-2 px-1 pt-1">
         <div className="flex min-w-0 items-center gap-2">
           <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: color }} aria-hidden />
-          <h3 className="truncate text-[13px] font-semibold text-foreground">{title}</h3>
+          <h3 className="truncate text-sm font-semibold text-foreground">{title}</h3>
         </div>
         <motion.span
           key={cards.length}
@@ -50,7 +50,7 @@ export const KanbanColumn = memo(({ id, title, color, cards, isOver, activeCardI
       </div>
 
       <SortableContext items={cards.map((card) => card.id)} strategy={verticalListSortingStrategy}>
-        <div className="flex flex-col gap-2 p-1">
+        <div className="flex flex-col gap-3 p-1">
           <AnimatePresence>
             {cards.map((card) => (
               <motion.div key={card.id} layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>

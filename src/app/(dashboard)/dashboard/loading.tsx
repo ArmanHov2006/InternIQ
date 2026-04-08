@@ -3,7 +3,7 @@ import { StatCardSkeleton } from "@/components/dashboard/stat-card-skeleton";
 
 export default function DashboardLoading() {
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <SkeletonShimmer className="h-14 w-64" />
       <div className="grid gap-4 lg:grid-cols-4">
         <StatCardSkeleton />

@@ -312,7 +312,7 @@ export default function InsightsPage() {
             </p>
           </GlassCard>
 
-          <GlassCard className="p-6">
+          <GlassCard className="p-6 shadow-glow-xs">
             <h2 className="text-base font-semibold">AI job fit prioritizer</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Recommended next applications based on fit, freshness, and stage.</p>
             <ul className="mt-4 space-y-2">
@@ -330,7 +330,7 @@ export default function InsightsPage() {
             </ul>
           </GlassCard>
 
-          <GlassCard className="p-6">
+          <GlassCard className="p-6 shadow-glow-xs">
             <h2 className="text-base font-semibold">Batch prep tools</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Select one application and generate a full preparation pack.</p>
             <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
@@ -355,7 +355,7 @@ export default function InsightsPage() {
             </div>
           </GlassCard>
 
-          <GlassCard className="p-6">
+          <GlassCard className="p-6 shadow-glow-xs">
             <h2 className="text-base font-semibold">Follow-up copilot</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Applications that likely need follow-up based on inactivity.</p>
             {followUps.length === 0 ? (

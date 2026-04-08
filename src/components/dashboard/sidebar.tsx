@@ -127,7 +127,7 @@ export const Sidebar = ({ collapsed, onToggleCollapse }: SidebarProps) => {
                 {displayName.slice(0, 1).toUpperCase()}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px] font-medium text-foreground">{displayName}</p>
+                <p className="truncate text-sm font-medium text-foreground">{displayName}</p>
                 <p className="truncate text-[11px] text-muted-foreground">{user.email ?? ""}</p>
               </div>
             </div>
