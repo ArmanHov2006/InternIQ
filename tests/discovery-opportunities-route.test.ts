@@ -2,8 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Opportunity } from "@/types/database";
 import { resolveDiscoveryScope } from "@/lib/server/opportunities-route";
 
-const { withAuthMock } = vi.hoisted(() => ({
+const { withAuthMock, isSchemaCompatErrorMock } = vi.hoisted(() => ({
   withAuthMock: vi.fn(),
+  isSchemaCompatErrorMock: vi.fn(),
 }));
 
 vi.mock("@/lib/server/route-utils", () => ({
@@ -12,7 +13,7 @@ vi.mock("@/lib/server/route-utils", () => ({
 }));
 
 vi.mock("@/lib/server/schema-compat", () => ({
-  isSchemaCompatError: () => false,
+  isSchemaCompatError: isSchemaCompatErrorMock,
 }));
 
 import { GET } from "@/app/api/opportunities/route";
@@ -117,6 +118,7 @@ const makeOpportunity = (overrides: Partial<Opportunity>): Opportunity => ({
 describe("opportunities discovery scope", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    isSchemaCompatErrorMock.mockReturnValue(false);
   });
 
   it("parses the latest shortlist discovery scope", () => {
@@ -222,5 +224,87 @@ describe("opportunities discovery scope", () => {
 
     expect(response.status).toBe(200);
     expect(data.map((row) => row.id)).toEqual(["fresh", "stale"]);
+  });
+
+  it("falls back to legacy discovery ordering when stale columns are unavailable", async () => {
+    isSchemaCompatErrorMock.mockReturnValue(true);
+    const opportunityRows = [
+      makeOpportunity({ id: "legacy-a", match_score: 88, discovery_is_stale: undefined }),
+      makeOpportunity({ id: "legacy-b", match_score: 77, discovery_is_stale: undefined }),
+    ];
+
+    const createCompatChain = (apply: (filters: FilterState, orders: string[]) => { data: Opportunity[] | null; error: unknown }) => {
+      const filters = createFilterState();
+      const orders: string[] = [];
+      const chain = {
+        eq(key: string, value: unknown) {
+          filters.eq.push([key, value]);
+          return chain;
+        },
+        not(key: string, operator: string, value: unknown) {
+          if (operator === "is" && value === null) {
+            filters.notNull.push(key);
+          }
+          return chain;
+        },
+        order(column: string) {
+          orders.push(column);
+          return chain;
+        },
+        then<TResult1 = { data: Opportunity[] | null; error: unknown }, TResult2 = never>(
+          onfulfilled?: ((value: { data: Opportunity[] | null; error: unknown }) => TResult1 | PromiseLike<TResult1>) | null,
+          onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+        ): Promise<TResult1 | TResult2> {
+          try {
+            const result = apply(filters, orders);
+            return Promise.resolve(onfulfilled ? onfulfilled(result) : (result as TResult1));
+          } catch (error) {
+            if (onrejected) {
+              return Promise.resolve(onrejected(error));
+            }
+            return Promise.reject(error);
+          }
+        },
+      };
+      return chain;
+    };
+
+    const supabase = {
+      from: (table: string) => {
+        if (table === "opportunities") {
+          return {
+            select: () =>
+              createCompatChain((filters, orders) => {
+                if (orders.includes("discovery_is_stale")) {
+                  return {
+                    data: null,
+                    error: { message: "column opportunities.discovery_is_stale does not exist", code: "42703" },
+                  };
+                }
+                return {
+                  data: applyFilters(opportunityRows, filters),
+                  error: null,
+                };
+              }),
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    withAuthMock.mockResolvedValue({
+      supabase,
+      user: { id: "user-1" },
+    });
+
+    const response = await GET(
+      new Request("http://localhost/api/opportunities?discovery_scope=active_discovered")
+    );
+    const data = (await response.json()) as Opportunity[];
+
+    expect(response.status).toBe(200);
+    expect(data.map((row) => row.id)).toEqual(["legacy-a", "legacy-b"]);
+    expect(data.every((row) => row.discovery_is_stale === false)).toBe(true);
   });
 });

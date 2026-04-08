@@ -59,6 +59,10 @@ export const fetchJSearchJobs = async (input: {
     signal: input.signal,
   });
 
+  if (res.status === 429) {
+    throw new Error("JSearch rate limited (HTTP 429, likely free-tier quota exhausted)");
+  }
+
   if (!res.ok) {
     throw new Error(`JSearch HTTP ${res.status}`);
   }

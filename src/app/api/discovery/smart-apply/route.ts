@@ -7,6 +7,11 @@ import { getResumeAndKeywords } from "@/lib/server/resume-keywords";
 import { generateDraftAnswersMarkdown } from "@/lib/services/discovery/draft-answers";
 import type { Application, Opportunity } from "@/types/database";
 
+type CoverLetterResult = {
+  title?: string;
+  content?: string;
+};
+
 const reserveSmartApplySlots = (userId: string, count: number): boolean => {
   for (let i = 0; i < count; i += 1) {
     const r = rateLimit(`discovery:smart:${userId}`, 60 * 60 * 1000, 10);
@@ -100,7 +105,7 @@ async function smartApplyOne(
   }
 
   try {
-    await fetch(`${origin}/api/cover-letter/generate`, {
+    const coverRes = await fetch(`${origin}/api/cover-letter/generate`, {
       method: "POST",
       headers: { cookie, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -111,6 +116,39 @@ async function smartApplyOne(
         tone: "professional",
       }),
     });
+
+    if (coverRes.ok) {
+      const coverPayload = (await coverRes.json()) as CoverLetterResult;
+      if (typeof coverPayload.title === "string" && typeof coverPayload.content === "string") {
+        const { data: applicationRow } = await supabase
+          .from("applications")
+          .select("ai_metadata")
+          .eq("id", applicationId)
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        const currentMeta =
+          applicationRow?.ai_metadata && typeof applicationRow.ai_metadata === "object"
+            ? (applicationRow.ai_metadata as Record<string, unknown>)
+            : {};
+
+        await supabase
+          .from("applications")
+          .update({
+            ai_metadata: {
+              ...currentMeta,
+              coverLetter: {
+                title: coverPayload.title,
+                content: coverPayload.content,
+                tone: "professional",
+              },
+            },
+            updated_at: new Date().toISOString(),
+          })
+          .eq("id", applicationId)
+          .eq("user_id", userId);
+      }
+    }
   } catch {
     /* optional */
   }

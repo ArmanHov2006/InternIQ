@@ -6,6 +6,7 @@ import {
   type DiscoveryAiScore,
   type DiscoveryGatingFlag,
 } from "@/lib/services/discovery/ai-scorer";
+import { isSchemaCompatError } from "@/lib/server/schema-compat";
 import type { Opportunity } from "@/types/database";
 
 type ScoreDiscoveryOptions = {
@@ -92,6 +93,53 @@ const shouldScoreOpportunity = (
   return !ai || ai.run_id !== resolvedRunId;
 };
 
+const withLegacyDiscoveryDefaults = (rows: Opportunity[]): Opportunity[] =>
+  rows.map((row) => ({
+    ...row,
+    discovery_last_seen_at: row.discovery_last_seen_at ?? row.updated_at ?? null,
+    discovery_missed_runs: row.discovery_missed_runs ?? 0,
+    discovery_is_stale: row.discovery_is_stale ?? false,
+  }));
+
+const fetchScoreCandidates = async (
+  supabase: SupabaseClient,
+  userId: string,
+  runId: string
+): Promise<Opportunity[]> => {
+  const baseQuery = () =>
+    supabase
+      .from("opportunities")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("source", "recommendation")
+      .eq("status", "new")
+      .eq("discovery_run_id", runId)
+      .not("api_source", "is", null);
+
+  const preferred = await baseQuery()
+    .order("discovery_is_stale", { ascending: true, nullsFirst: true })
+    .order("match_score", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
+
+  if (!preferred.error) {
+    return withLegacyDiscoveryDefaults((preferred.data ?? []) as Opportunity[]);
+  }
+
+  if (!isSchemaCompatError(preferred.error)) {
+    throw new Error(preferred.error.message);
+  }
+
+  const fallback = await baseQuery()
+    .order("match_score", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
+
+  if (fallback.error) {
+    throw new Error(fallback.error.message);
+  }
+
+  return withLegacyDiscoveryDefaults((fallback.data ?? []) as Opportunity[]);
+};
+
 export async function scoreDiscoveryShortlistForUser(
   supabase: SupabaseClient,
   userId: string,
@@ -102,28 +150,14 @@ export async function scoreDiscoveryShortlistForUser(
     return { runId: null, scored: 0, candidates: 0, remaining: 0, done: true };
   }
 
-  const { data, error } = await supabase
-    .from("opportunities")
-    .select("*")
-    .eq("user_id", userId)
-    .eq("source", "recommendation")
-    .eq("status", "new")
-    .eq("discovery_run_id", resolvedRunId)
-    .not("api_source", "is", null)
-    .order("discovery_is_stale", { ascending: true, nullsFirst: true })
-    .order("match_score", { ascending: false, nullsFirst: false })
-    .order("updated_at", { ascending: false });
-
-  if (error) {
-    throw new Error(error.message);
-  }
+  const data = await fetchScoreCandidates(supabase, userId, resolvedRunId);
 
   const explicitIds =
     Array.isArray(options.opportunityIds) && options.opportunityIds.length > 0
       ? new Set(options.opportunityIds)
       : undefined;
 
-  const eligible = ((data ?? []) as Opportunity[]).filter((opportunity) =>
+  const eligible = data.filter((opportunity) =>
     shouldScoreOpportunity(opportunity, resolvedRunId, explicitIds)
   );
 

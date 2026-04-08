@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Opportunity } from "@/types/database";
 import { getResumeAndKeywords } from "@/lib/server/resume-keywords";
 import {
@@ -16,6 +17,61 @@ import {
 } from "@/lib/server/route-utils";
 import { resolveDiscoveryScope } from "@/lib/server/opportunities-route";
 import { isSchemaCompatError } from "@/lib/server/schema-compat";
+
+const withLegacyDiscoveryDefaults = (rows: Opportunity[]): Opportunity[] =>
+  rows.map((row) => ({
+    ...row,
+    discovery_last_seen_at: row.discovery_last_seen_at ?? row.updated_at ?? null,
+    discovery_missed_runs: row.discovery_missed_runs ?? 0,
+    discovery_is_stale: row.discovery_is_stale ?? false,
+  }));
+
+const fetchActiveDiscoveredRows = async (
+  supabase: SupabaseClient,
+  userId: string
+): Promise<{ data: Opportunity[]; legacyFallback: boolean; error: { message: string } | null }> => {
+  const baseQuery = () =>
+    supabase
+      .from("opportunities")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("source", "recommendation")
+      .eq("status", "new")
+      .not("api_source", "is", null);
+
+  const preferred = await baseQuery()
+    .order("discovery_is_stale", { ascending: true, nullsFirst: true })
+    .order("match_score", { ascending: false, nullsFirst: false })
+    .order("posted_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
+
+  if (!preferred.error) {
+    return {
+      data: withLegacyDiscoveryDefaults((preferred.data ?? []) as Opportunity[]),
+      legacyFallback: false,
+      error: null,
+    };
+  }
+
+  if (!isSchemaCompatError(preferred.error)) {
+    return { data: [], legacyFallback: false, error: preferred.error };
+  }
+
+  const fallback = await baseQuery()
+    .order("match_score", { ascending: false, nullsFirst: false })
+    .order("posted_at", { ascending: false, nullsFirst: false })
+    .order("updated_at", { ascending: false });
+
+  if (fallback.error) {
+    return { data: [], legacyFallback: true, error: fallback.error };
+  }
+
+  return {
+    data: withLegacyDiscoveryDefaults((fallback.data ?? []) as Opportunity[]),
+    legacyFallback: true,
+    error: null,
+  };
+};
 
 const discoveryFieldsFromBody = (body: Record<string, unknown>) => {
   const api_source =
@@ -118,17 +174,7 @@ export async function GET(request: Request) {
     }
 
     if (discoveryScope === "active_discovered") {
-      const { data, error } = await supabase
-        .from("opportunities")
-        .select("*")
-        .eq("user_id", user.id)
-        .eq("source", "recommendation")
-        .eq("status", "new")
-        .not("api_source", "is", null)
-        .order("discovery_is_stale", { ascending: true, nullsFirst: true })
-        .order("match_score", { ascending: false, nullsFirst: false })
-        .order("posted_at", { ascending: false, nullsFirst: false })
-        .order("updated_at", { ascending: false });
+      const { data, error } = await fetchActiveDiscoveredRows(supabase, user.id);
 
       if (error) {
         if (isSchemaCompatError(error)) {
@@ -137,7 +183,7 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
 
-      return NextResponse.json((data ?? []) as Opportunity[]);
+      return NextResponse.json(data);
     }
 
     const { data, error } = await supabase
