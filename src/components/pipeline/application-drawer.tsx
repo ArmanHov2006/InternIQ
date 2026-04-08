@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Check, Copy, FileText, Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { APPLICATION_STATUSES, STATUS_LABELS, STATUS_COLORS } from "@/lib/constants";
 import type { Application } from "@/types/database";
@@ -99,6 +99,84 @@ const parseSavedFitResult = (application: Application): AnalyzeResult | null => 
     };
   }
 };
+
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("Failed to copy to clipboard.");
+    }
+  };
+
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
+      className="h-7 gap-1 px-2 text-xs text-muted-foreground hover:text-foreground"
+      onClick={handleCopy}
+    >
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-emerald-500" aria-hidden />
+      ) : (
+        <Copy className="h-3.5 w-3.5" aria-hidden />
+      )}
+      {copied ? "Copied" : (label ?? "Copy")}
+    </Button>
+  );
+}
+
+function MaterialSection({
+  icon,
+  title,
+  content,
+  loading,
+  emptyMessage,
+  isAiContent,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  content: string | null;
+  loading?: boolean;
+  emptyMessage: string;
+  isAiContent?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          {icon}
+          <span className="text-sm font-medium text-foreground">{title}</span>
+        </div>
+        {content ? <CopyButton text={content} /> : null}
+      </div>
+      {loading ? (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
+          Loading…
+        </div>
+      ) : content ? (
+        <pre
+          className={cn(
+            "whitespace-pre-wrap rounded-lg border p-4 text-sm leading-relaxed text-foreground",
+            isAiContent
+              ? "border-primary/20 bg-muted/30 shadow-glow-xs"
+              : "border-border bg-muted/40"
+          )}
+        >
+          {content}
+        </pre>
+      ) : (
+        <p className="text-sm text-muted-foreground">{emptyMessage}</p>
+      )}
+    </div>
+  );
+}
 
 const toFormState = (application: Application): FormState => ({
   company: application.company ?? "",
@@ -357,7 +435,7 @@ export function ApplicationDrawer({
               value="drafts"
               className="relative flex-1 rounded-none border-b-2 border-transparent py-3 text-sm font-medium text-muted-foreground shadow-none data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground data-[state=active]:shadow-none"
             >
-              Draft Answers
+              Materials
             </TabsTrigger>
           </TabsList>
 
@@ -629,25 +707,36 @@ export function ApplicationDrawer({
             value="drafts"
             className="mt-0 flex-1 overflow-y-auto px-6 pb-6 pt-4 data-[state=inactive]:hidden"
           >
-            <div className="space-y-2">
+            <div className="space-y-6">
               <p className="text-xs text-muted-foreground">
-                Generated for external application forms. Copy sections into the employer site — nothing is submitted
+                AI-generated materials for this application. Copy sections into the employer site — nothing is submitted
                 automatically.
               </p>
-              {draftLoading ? (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                  Loading…
-                </div>
-              ) : draftAnswers ? (
-                <pre className="whitespace-pre-wrap rounded-lg border border-border bg-muted/40 p-4 text-sm leading-relaxed text-foreground">
-                  {draftAnswers}
-                </pre>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  No draft answers yet. Use Smart Apply from Discover to generate them.
-                </p>
-              )}
+
+              {/* Cover Letter section */}
+              <MaterialSection
+                icon={<FileText className="h-4 w-4 text-muted-foreground" aria-hidden />}
+                title="Cover Letter"
+                content={
+                  (() => {
+                    const meta = application.ai_metadata as Record<string, unknown> | null | undefined;
+                    const cl = meta?.coverLetter as { content?: string } | undefined;
+                    return typeof cl?.content === "string" ? cl.content : null;
+                  })()
+                }
+                emptyMessage="No cover letter yet. Generate one from the AI Actions tab."
+                isAiContent
+              />
+
+              {/* Draft Answers section */}
+              <MaterialSection
+                icon={<Sparkles className="h-4 w-4 text-muted-foreground" aria-hidden />}
+                title="Draft Answers"
+                content={draftAnswers}
+                loading={draftLoading}
+                emptyMessage="Generate draft answers by using Smart Apply from the Discover page."
+                isAiContent
+              />
             </div>
           </TabsContent>
         </Tabs>
