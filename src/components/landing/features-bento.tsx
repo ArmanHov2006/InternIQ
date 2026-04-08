@@ -312,7 +312,7 @@ export const FeaturesBento = () => {
         </SectionReveal>
       </div>
 
-      <div className="mx-auto mt-12 grid max-w-7xl gap-4 md:grid-cols-2 xl:auto-rows-[minmax(220px,auto)] xl:grid-cols-4">
+      <div className="mx-auto mt-12 grid max-w-7xl gap-5 md:grid-cols-2 xl:auto-rows-[minmax(220px,auto)] xl:grid-cols-4">
         <SectionReveal delay={0.05} className="md:col-span-2 xl:row-span-2">
           <BentoCard className="flex h-full flex-col">
             <Link href={PIPELINE_FROM_FEATURES} aria-label="Open pipeline - kanban board" className={trackerHeaderLinkClass}>
@@ -348,9 +348,7 @@ export const FeaturesBento = () => {
                   live workspace
                 </span>
               </div>
-              <div className="[transform:perspective(1000px)_rotateX(3deg)]">
-                <InteractiveDemo />
-              </div>
+              <InteractiveDemo />
             </div>
           </BentoCard>
         </SectionReveal>

@@ -16,27 +16,8 @@ const features = [
 export const CtaSection = () => {
   return (
     <section className="relative px-4 py-24 sm:py-32">
-      {/* Ambient orbs */}
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <motion.div 
-          animate={{ y: [0, -15, 0], x: [0, 10, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute left-[10%] top-[25%] h-32 w-32 rounded-full bg-primary/25 blur-[60px]" 
-        />
-        <motion.div 
-          animate={{ y: [0, 12, 0], x: [0, -8, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut", delay: 1 }}
-          className="absolute right-[15%] top-[30%] h-28 w-28 rounded-full bg-accent/20 blur-[50px]" 
-        />
-        <motion.div 
-          animate={{ scale: [1, 1.15, 1] }}
-          transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute bottom-[20%] left-[45%] h-36 w-36 rounded-full bg-accent-warm/15 blur-[70px]" 
-        />
-      </div>
-      
       <SectionReveal>
-        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-white/10">
+        <div className="relative mx-auto max-w-5xl overflow-hidden rounded-3xl border border-border">
           {/* Gradient mesh background */}
           <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-accent-warm/10" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,oklch(0.65_0.25_265_/_15%),transparent_50%)]" />
@@ -98,7 +79,7 @@ export const CtaSection = () => {
                 asChild
                 variant="outline"
                 size="lg"
-                className="border-white/15 bg-white/[0.03] text-base"
+                className="border-border bg-muted/30 text-base"
               >
                 <Link href="/demo">Watch Demo</Link>
               </MagneticButton>
@@ -115,7 +96,7 @@ export const CtaSection = () => {
               {features.map((feature) => (
                 <div
                   key={feature.text}
-                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-4 py-2 text-sm text-muted-foreground"
+                  className="flex items-center gap-2 rounded-full border border-border bg-white/[0.08] px-4 py-2 text-sm text-muted-foreground"
                 >
                   <feature.icon className="h-4 w-4 text-primary" />
                   {feature.text}

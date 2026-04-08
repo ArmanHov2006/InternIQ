@@ -34,7 +34,7 @@ const socialLinks = [
 
 export const Footer = () => {
   return (
-    <footer className="relative border-t border-white/10 px-4 py-16">
+    <footer className="relative border-t border-border px-4 py-16">
       {/* Background gradient */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-primary/[0.03] to-transparent" />
       
@@ -63,7 +63,7 @@ export const Footer = () => {
                   rel="noopener noreferrer"
                   aria-label={social.label}
                   whileHover={{ y: -2 }}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-white/10 bg-white/[0.03] transition-colors hover:border-white/20 hover:bg-white/[0.06]"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-muted/30 transition-colors hover:border-primary/40 hover:bg-muted/50"
                 >
                   <social.icon className="h-4 w-4 text-muted-foreground" />
                 </motion.a>
@@ -124,7 +124,7 @@ export const Footer = () => {
         </div>
 
         {/* Bottom bar */}
-        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-8 sm:flex-row">
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-border pt-8 sm:flex-row">
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} InternIQ. All rights reserved.
           </p>

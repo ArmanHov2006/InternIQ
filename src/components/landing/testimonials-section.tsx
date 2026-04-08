@@ -56,9 +56,9 @@ const TestimonialCard = ({ testimonial }: { testimonial: (typeof testimonials)[0
     whileHover={{ y: -4, scale: 1.02 }}
     transition={{ type: "spring", stiffness: 400, damping: 25 }}
   >
-    <GlassCard className="group relative min-w-[340px] max-w-[340px] p-6 transition-all hover:border-white/20 hover:shadow-glow-sm">
+    <GlassCard className="group relative w-[340px] shrink-0 p-6 transition-all hover:border-white/20 hover:shadow-glow-sm">
       {/* Quote icon */}
-      <div className="absolute -top-3 -left-2 rounded-full bg-primary/20 p-2">
+      <div className="absolute top-4 right-4 rounded-full bg-primary/20 p-2">
         <Quote className="h-4 w-4 text-primary" />
       </div>
       
@@ -74,7 +74,7 @@ const TestimonialCard = ({ testimonial }: { testimonial: (typeof testimonials)[0
       
       {/* Author */}
       <div className="mt-5 flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/40 to-accent/40 text-xs font-semibold">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/40 to-primary/20 text-xs font-semibold">
           {testimonial.avatar}
         </div>
         <div>
@@ -120,11 +120,11 @@ export const TestimonialsSection = () => {
       {/* Marquee rows */}
       <div className="mt-12 space-y-4">
         {/* Row 1 - Left to right */}
-        <div className="relative">
+        <div className="group relative">
           <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-32 bg-gradient-to-r from-background to-transparent" />
           <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-32 bg-gradient-to-l from-background to-transparent" />
-          <motion.div 
-            className="flex w-max gap-4"
+          <motion.div
+            className="flex w-max gap-4 group-hover:[animation-play-state:paused]"
             animate={{ x: ["0%", "-50%"] }}
             transition={{ duration: 40, repeat: Infinity, ease: "linear" }}
           >
@@ -135,11 +135,11 @@ export const TestimonialsSection = () => {
         </div>
 
         {/* Row 2 - Right to left */}
-        <div className="relative">
+        <div className="group relative">
           <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-32 bg-gradient-to-r from-background to-transparent" />
           <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-32 bg-gradient-to-l from-background to-transparent" />
-          <motion.div 
-            className="flex w-max gap-4"
+          <motion.div
+            className="flex w-max gap-4 group-hover:[animation-play-state:paused]"
             animate={{ x: ["-50%", "0%"] }}
             transition={{ duration: 45, repeat: Infinity, ease: "linear" }}
           >
