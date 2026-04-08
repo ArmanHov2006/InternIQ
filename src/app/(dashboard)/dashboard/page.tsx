@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, ArrowRight, CheckCircle2, Mail, BookOpen, AlertTriangle, CheckCheck } from "lucide-react";
 import type { Application } from "@/types/database";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { StatCardSkeleton } from "@/components/dashboard/stat-card-skeleton";
 import { GlassCard } from "@/components/ui/glass-card";
-import { EmptyState } from "@/components/ui/empty-state";
+import { Badge } from "@/components/ui/badge";
+import { STATUS_COLORS, STATUS_LABELS } from "@/lib/constants";
+import { cn } from "@/lib/utils";
 
 const pipelineStatuses: Application["status"][] = [
   "saved",
@@ -25,39 +27,66 @@ const pipelineColors: Record<Application["status"], string> = {
   rejected: "bg-[var(--status-rejected)]",
 };
 
-/** Last 6 weeks counts of created applications */
+function relativeTime(dateStr: string): string {
+  const mins = Math.floor((Date.now() - new Date(dateStr).getTime()) / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return days < 7 ? `${days}d ago` : `${Math.floor(days / 7)}w ago`;
+}
+
 function weeklyCreationTrend(apps: Application[]): { value: number }[] {
-  const now = Date.now();
-  const weekMs = 7 * 24 * 60 * 60 * 1000;
-  const buckets = Array.from({ length: 6 }, () => 0);
+  const now = Date.now(), weekMs = 604800000, buckets = Array.from({ length: 6 }, () => 0);
   for (const app of apps) {
-    const t = new Date(app.created_at).getTime();
-    const weeksAgo = Math.floor((now - t) / weekMs);
-    if (weeksAgo >= 0 && weeksAgo < 6) {
-      buckets[5 - weeksAgo] += 1;
-    }
+    const w = Math.floor((now - new Date(app.created_at).getTime()) / weekMs);
+    if (w >= 0 && w < 6) buckets[5 - w] += 1;
   }
   return buckets.map((value) => ({ value }));
 }
 
-type SuggestionRow = {
-  id: string;
-  application_id: string;
-  status: string;
-  reason?: string;
-};
+type SuggestionRow = { id: string; application_id: string; status: string; reason?: string };
+
+const severityConfig = {
+  gmail: { dot: "bg-blue-500", icon: Mail },
+  interview: { dot: "bg-purple-500", icon: BookOpen },
+  stale: { dot: "bg-orange-500", icon: AlertTriangle },
+} as const;
+
+type AttentionItem = { id: string; label: string; context: string; href: string; severity: keyof typeof severityConfig };
+
+function StepItem({ step, done, title, description, href }: { step: number; done: boolean; title: string; description: string; href: string }) {
+  return (
+    <Link href={href} className="group flex items-start gap-3 rounded-md px-3 py-3 transition-colors hover:bg-muted/30">
+      <div className={cn("mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-medium", done ? "bg-green-500/15 text-green-600 dark:text-green-400" : "border border-border text-muted-foreground")}>
+        {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : step}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={cn("text-sm font-medium", done && "text-muted-foreground line-through")}>{title}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <ArrowRight className="mt-1 h-3.5 w-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+    </Link>
+  );
+}
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [applications, setApplications] = useState<Application[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionRow[]>([]);
+  const [hasResume, setHasResume] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     const run = async () => {
       try {
-        const [appRes, sugRes] = await Promise.all([
+        const [appRes, sugRes, resumeRes] = await Promise.all([
           fetch("/api/applications", { credentials: "same-origin", headers: { Accept: "application/json" } }),
           fetch("/api/automation/status-suggestions", { credentials: "same-origin", headers: { Accept: "application/json" } }).catch(
+            () => null
+          ),
+          fetch("/api/resumes", { credentials: "same-origin", headers: { Accept: "application/json" } }).catch(
             () => null
           ),
         ]);
@@ -69,12 +98,24 @@ export default function DashboardPage() {
           const payload = (await sugRes.json()) as SuggestionRow[] | { error?: string };
           setSuggestions(Array.isArray(payload) ? payload : []);
         }
+        if (resumeRes?.ok) {
+          const resumes = (await resumeRes.json()) as unknown[];
+          setHasResume(Array.isArray(resumes) && resumes.length > 0);
+        }
       } finally {
         setLoading(false);
       }
     };
     void run();
   }, []);
+
+  // Trigger bar animation after mount
+  useEffect(() => {
+    if (!loading) {
+      const timer = setTimeout(() => setMounted(true), 50);
+      return () => clearTimeout(timer);
+    }
+  }, [loading]);
 
   const metrics = useMemo(() => {
     const total = applications.length;
@@ -95,51 +136,22 @@ export default function DashboardPage() {
   const trend = useMemo(() => weeklyCreationTrend(applications), [applications]);
 
   const needsAttention = useMemo(() => {
-    const items: { id: string; label: string; href: string }[] = [];
-    const pending = suggestions.filter((s) => s.status === "pending");
-    for (const s of pending.slice(0, 3)) {
-      items.push({
-        id: `sug-${s.id}`,
-        label: "Review Gmail status suggestion",
-        href: `/dashboard/settings?section=integrations`,
-      });
-    }
-    const interviewApps = applications.filter((a) => a.status === "interview");
-    const interviewNoPrep = interviewApps.filter((a) => {
-      const meta = a.ai_metadata;
-      const hasPrep =
-        meta &&
-        typeof meta === "object" &&
-        "interviewPrep" in meta &&
-        meta.interviewPrep &&
-        typeof meta.interviewPrep === "object" &&
-        Array.isArray((meta.interviewPrep as { questions?: unknown }).questions) &&
-        (meta.interviewPrep as { questions: unknown[] }).questions.length > 0;
-      return !hasPrep;
-    });
-    for (const a of interviewNoPrep) {
-      if (items.length >= 3) break;
-      items.push({
-        id: `prep-${a.id}`,
-        label: `${a.company} — interview stage, no prep generated`,
-        href: `/dashboard/pipeline?app=${a.id}`,
-      });
-    }
-    const staleSaved = applications.filter((a) => {
-      if (a.status !== "saved") return false;
-      const created = new Date(a.created_at).getTime();
-      return Date.now() - created > 7 * 24 * 60 * 60 * 1000;
-    });
-    for (const a of staleSaved) {
-      if (items.length >= 3) break;
-      items.push({
-        id: `stale-${a.id}`,
-        label: `${a.company} — saved over 7 days`,
-        href: `/dashboard/pipeline?app=${a.id}`,
-      });
-    }
-    return items.slice(0, 3);
+    const items: AttentionItem[] = [];
+    for (const s of suggestions.filter((s) => s.status === "pending"))
+      items.push({ id: `sug-${s.id}`, label: "Review Gmail status suggestion", context: s.reason || "New status detected from email", href: "/dashboard/settings?section=integrations", severity: "gmail" });
+    const hasPrep = (a: Application) => {
+      const m = a.ai_metadata;
+      return m && typeof m === "object" && "interviewPrep" in m && m.interviewPrep && typeof m.interviewPrep === "object" && Array.isArray((m.interviewPrep as { questions?: unknown }).questions) && (m.interviewPrep as { questions: unknown[] }).questions.length > 0;
+    };
+    for (const a of applications.filter((a) => a.status === "interview" && !hasPrep(a)))
+      items.push({ id: `prep-${a.id}`, label: `${a.company} — interview prep needed`, context: `${a.role} — no prep questions generated yet`, href: `/dashboard/pipeline?app=${a.id}`, severity: "interview" });
+    for (const a of applications.filter((a) => a.status === "saved" && Date.now() - new Date(a.created_at).getTime() > 604800000))
+      items.push({ id: `stale-${a.id}`, label: `${a.company} — saved over 7 days`, context: `${a.role} — consider applying or removing`, href: `/dashboard/pipeline?app=${a.id}`, severity: "stale" });
+    return items;
   }, [applications, suggestions]);
+
+  const needsAttentionVisible = needsAttention.slice(0, 3);
+  const needsAttentionTotal = needsAttention.length;
 
   const recentActivity = useMemo(() => {
     return [...applications]
@@ -181,50 +193,110 @@ export default function DashboardPage() {
         </div>
       )}
 
+      {/* Getting Started (empty state) */}
       {applications.length === 0 && !loading ? (
-        <EmptyState
-          icon={<BarChart3 className="h-5 w-5" />}
-          title="No applications yet"
-          description="Add an application to see analytics."
-          action={<Link className="text-sm text-primary underline-offset-4 hover:underline" href="/dashboard/pipeline">Open pipeline</Link>}
-        />
+        <GlassCard className="border-border p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 className="h-4 w-4 text-primary" />
+            <h2 className="text-sm font-semibold">Getting started</h2>
+          </div>
+          <div className="space-y-1">
+            <StepItem
+              step={1}
+              done={hasResume}
+              title="Upload your resume"
+              description="Your resume powers AI fit scoring and tailored suggestions."
+              href="/dashboard/settings?section=resumes"
+            />
+            <StepItem
+              step={2}
+              done={false}
+              title="Set discovery preferences"
+              description="Tell us your target roles, locations, and industries."
+              href="/dashboard/discover"
+            />
+            <StepItem
+              step={3}
+              done={false}
+              title="Add your first application"
+              description="Track applications through your pipeline from saved to offer."
+              href="/dashboard/pipeline"
+            />
+          </div>
+        </GlassCard>
       ) : null}
 
       {applications.length > 0 ? (
         <>
-          {needsAttention.length > 0 ? (
+          {/* Needs attention */}
+          {needsAttentionVisible.length > 0 ? (
             <GlassCard className="border-border p-5">
-              <h2 className="text-sm font-semibold">Needs attention</h2>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold">Needs attention</h2>
+                {needsAttentionTotal > 3 && (
+                  <Link
+                    href="/dashboard/pipeline"
+                    className="text-xs text-primary hover:underline underline-offset-4"
+                  >
+                    View all ({needsAttentionTotal})
+                  </Link>
+                )}
+              </div>
               <ul className="mt-3 space-y-2">
-                {needsAttention.map((item) => (
-                  <li key={item.id}>
-                    <Link
-                      href={item.href}
-                      className="block rounded-md border border-border px-3 py-2 text-sm transition-colors hover:bg-muted/30"
-                    >
-                      {item.label}
-                    </Link>
-                  </li>
-                ))}
+                {needsAttentionVisible.map((item) => {
+                  const config = severityConfig[item.severity];
+                  const Icon = config.icon;
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        href={item.href}
+                        className="flex items-start gap-3 rounded-md border border-border px-3 py-2.5 text-sm transition-colors hover:bg-muted/30"
+                      >
+                        <div className="mt-0.5 flex items-center gap-2 shrink-0">
+                          <span className={cn("h-2 w-2 rounded-full", config.dot)} />
+                          <Icon className="h-3.5 w-3.5 text-muted-foreground" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium truncate">{item.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate">{item.context}</p>
+                        </div>
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </GlassCard>
-          ) : null}
+          ) : (
+            <GlassCard className="border-border p-5">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <CheckCheck className="h-4 w-4" />
+                <p className="text-sm">You&apos;re all caught up &mdash; nothing needs attention right now.</p>
+              </div>
+            </GlassCard>
+          )}
 
+          {/* Pipeline funnel */}
           <GlassCard className="border-border p-6">
             <h2 className="text-base font-semibold">Pipeline funnel</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Share of applications by stage</p>
             <div className="mt-4 space-y-3">
               {pipelineStatuses.map((status) => {
                 const count = metrics.byStatus[status];
-                const width = metrics.total ? (count / metrics.total) * 100 : 0;
+                const pct = metrics.total ? Math.round((count / metrics.total) * 100) : 0;
+                const width = mounted ? pct : 0;
                 return (
                   <div key={status} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="capitalize text-foreground">{status.replace("_", " ")}</span>
-                      <span className="text-muted-foreground">{count}</span>
+                      <span className="text-muted-foreground">
+                        {count} <span className="font-mono text-muted-foreground/70">({pct}%)</span>
+                      </span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-muted/40">
-                      <div className={`h-full transition-all ${pipelineColors[status]}`} style={{ width: `${width}%` }} />
+                      <div
+                        className={cn("h-full rounded-full transition-all duration-700 ease-out", pipelineColors[status])}
+                        style={{ width: `${width}%` }}
+                      />
                     </div>
                   </div>
                 );
@@ -232,6 +304,7 @@ export default function DashboardPage() {
             </div>
           </GlassCard>
 
+          {/* Recent activity */}
           <GlassCard className="border-border p-6">
             <h2 className="text-base font-semibold">Recent activity</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">Latest updates</p>
@@ -242,13 +315,24 @@ export default function DashboardPage() {
                     href={`/dashboard/pipeline?app=${application.id}`}
                     className="flex items-center justify-between rounded-md border border-transparent px-2 py-2 text-sm transition-colors hover:border-border hover:bg-muted/20"
                   >
-                    <div>
-                      <p className="font-medium">{application.company}</p>
-                      <p className="text-xs text-muted-foreground">{application.role}</p>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium truncate">{application.company}</p>
+                      <p className="text-xs text-muted-foreground truncate">{application.role}</p>
                     </div>
-                    <span className="rounded-md border border-border px-2 py-0.5 text-xs capitalize text-muted-foreground">
-                      {application.status.replace("_", " ")}
-                    </span>
+                    <div className="flex items-center gap-2 shrink-0 ml-3">
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {relativeTime(application.updated_at)}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs capitalize",
+                          STATUS_COLORS[application.status as keyof typeof STATUS_COLORS]
+                        )}
+                      >
+                        {STATUS_LABELS[application.status as keyof typeof STATUS_LABELS] ?? application.status}
+                      </Badge>
+                    </div>
                   </Link>
                 </li>
               ))}
