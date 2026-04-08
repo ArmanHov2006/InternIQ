@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { X, Send, Trash2, Minus, ChevronUp } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useKanbanStore, type StatusId } from "@/stores/kanban-store";
 import { useChatStore, type ChatMessage } from "@/stores/chat-store";
@@ -199,7 +200,7 @@ export const Chatbot = () => {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ company, role, status, location, job_url: jobUrl, notes }),
-            }).catch(() => {});
+            }).catch(() => { toast.error("Could not save application to server"); });
             break;
           }
           case "open_add_dialog":
@@ -244,7 +245,7 @@ export const Chatbot = () => {
                     notes: (match.notes || "") + "\n" + newNotes,
                   }),
                 }),
-              }).catch(() => {});
+              }).catch(() => { toast.error("Could not update application on server"); });
             }
             break;
           }

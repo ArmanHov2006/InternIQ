@@ -52,9 +52,29 @@ export default function SettingsPage() {
         <p className="mt-1 text-sm text-muted-foreground">Profile, resumes, and integrations</p>
       </div>
 
+      {/* Mobile pill navigation */}
+      <nav className="flex gap-2 overflow-x-auto md:hidden" aria-label="Settings sections">
+        {NAV_ITEMS.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => scrollToSection(item.id)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-colors duration-100 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              activeSection === item.id
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground"
+            )}
+          >
+            <item.icon className="h-3.5 w-3.5" />
+            {item.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="grid gap-8 md:grid-cols-[220px_1fr]">
         {/* Side navigation */}
-        <nav className="hidden md:block">
+        <nav className="hidden md:block" aria-label="Settings sections">
           <div className="sticky top-24 space-y-1">
             {NAV_ITEMS.map((item) => (
               <button
