@@ -55,6 +55,22 @@ type AddApplicationDialogProps = {
   onCreated: (application: Application) => void;
 };
 
+type FieldErrors = {
+  company?: string;
+  role?: string;
+  job_url?: string;
+};
+
+function validateForm(form: FormState): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!form.company.trim()) errors.company = "Company is required.";
+  if (!form.role.trim()) errors.role = "Role is required.";
+  if (form.job_url.trim() && !/^https?:\/\//.test(form.job_url.trim())) {
+    errors.job_url = "URL must start with http:// or https://";
+  }
+  return errors;
+}
+
 export function AddApplicationDialog({
   open,
   onOpenChange,
@@ -62,18 +78,31 @@ export function AddApplicationDialog({
 }: AddApplicationDialogProps) {
   const [form, setForm] = useState<FormState>(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [errors, setErrors] = useState<FieldErrors>({});
 
   useEffect(() => {
-    if (!open) setForm(INITIAL_FORM);
+    if (!open) {
+      setForm(INITIAL_FORM);
+      setErrors({});
+    }
   }, [open]);
 
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+    // Clear the error for this field when the user edits it
+    if (errors[key as keyof FieldErrors]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[key as keyof FieldErrors];
+        return next;
+      });
+    }
   };
 
   const handleSubmit = async () => {
-    if (!form.company.trim() || !form.role.trim()) {
-      toast.error("Company and role are required.");
+    const validationErrors = validateForm(form);
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
       return;
     }
 
@@ -130,7 +159,12 @@ export function AddApplicationDialog({
                 value={form.company}
                 onChange={(e) => setField("company", e.target.value)}
                 placeholder="Stripe"
+                aria-invalid={Boolean(errors.company)}
+                className={errors.company ? "border-destructive" : undefined}
               />
+              {errors.company && (
+                <p className="text-xs text-destructive">{errors.company}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="app-role">Role</Label>
@@ -139,7 +173,12 @@ export function AddApplicationDialog({
                 value={form.role}
                 onChange={(e) => setField("role", e.target.value)}
                 placeholder="Job title or role"
+                aria-invalid={Boolean(errors.role)}
+                className={errors.role ? "border-destructive" : undefined}
               />
+              {errors.role && (
+                <p className="text-xs text-destructive">{errors.role}</p>
+              )}
             </div>
           </div>
 
@@ -150,7 +189,12 @@ export function AddApplicationDialog({
               value={form.job_url}
               onChange={(e) => setField("job_url", e.target.value)}
               placeholder="https://jobs.example.com/..."
+              aria-invalid={Boolean(errors.job_url)}
+              className={errors.job_url ? "border-destructive" : undefined}
             />
+            {errors.job_url && (
+              <p className="text-xs text-destructive">{errors.job_url}</p>
+            )}
           </div>
 
           <div className="grid gap-2 sm:grid-cols-3">

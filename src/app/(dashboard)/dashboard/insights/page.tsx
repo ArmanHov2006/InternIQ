@@ -9,6 +9,7 @@ import { GlassCard } from "@/components/ui/glass-card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SkeletonShimmer } from "@/components/ui/skeleton-shimmer";
+import { FeatureErrorBoundary } from "@/components/error-boundary";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -263,7 +264,7 @@ export default function InsightsPage() {
           }
         />
       ) : (
-        <>
+        <FeatureErrorBoundary title="Insights error" description="Analytics encountered an error. Your data is safe — try again.">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <GlassCard className="p-4">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
@@ -398,7 +399,7 @@ export default function InsightsPage() {
               </ul>
             )}
           </GlassCard>
-        </>
+        </FeatureErrorBoundary>
       )}
     </div>
   );

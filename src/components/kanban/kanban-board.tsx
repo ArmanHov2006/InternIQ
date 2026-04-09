@@ -25,6 +25,7 @@ import { KanbanColumn } from "@/components/kanban/kanban-column";
 import { KanbanCardFace } from "@/components/kanban/kanban-card";
 import { ApplicationDrawer } from "@/components/pipeline/application-drawer";
 import { KanbanFilters } from "@/components/kanban/kanban-filters";
+import { FeatureErrorBoundary } from "@/components/error-boundary";
 import { buildPipelinePath, getPipelineAppIdFromSearch } from "@/lib/navigation/dashboard-routes";
 import { useKanbanStore, type KanbanCardData, type StatusId } from "@/stores/kanban-store";
 import type { Application } from "@/types/database";
@@ -386,7 +387,7 @@ export const KanbanBoard = () => {
   };
 
   return (
-    <>
+    <FeatureErrorBoundary title="Pipeline error" description="The Kanban board encountered an error. Your data is safe — try again.">
       <KanbanFilters search={search} onSearchChange={setSearch} filter={filter} onFilterChange={setFilter} />
       <DndContext
         sensors={sensors}
@@ -473,6 +474,6 @@ export const KanbanBoard = () => {
           replacePipelineAppQuery(null);
         }}
       />
-    </>
+    </FeatureErrorBoundary>
   );
 };
