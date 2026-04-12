@@ -77,7 +77,7 @@ export function LocalProfilePreview({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Projects</h3>
         <div className="mt-3 space-y-3">
           {projects.map((project) => (
-            <div key={project.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div key={project.id} className="rounded-lg border border-border bg-muted/30 p-3">
               <p className="font-medium">{project.title}</p>
               {project.description ? (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{project.description}</p>
@@ -111,7 +111,7 @@ export function LocalProfilePreview({
         <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Experience</h3>
         <div className="mt-3 space-y-3">
           {experiences.map((experience) => (
-            <div key={experience.id} className="rounded-lg border border-white/10 bg-white/[0.02] p-3">
+            <div key={experience.id} className="rounded-lg border border-border bg-muted/30 p-3">
               <p className="font-medium">
                 {experience.role} · {experience.company}
               </p>

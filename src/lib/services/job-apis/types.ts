@@ -7,7 +7,8 @@ export type JobApiSource =
   | "jobicy"
   | "remoteok"
   | "jooble"
-  | "usajobs";
+  | "usajobs"
+  | "linkedin";
 
 export interface NormalizedJob {
   title: string;

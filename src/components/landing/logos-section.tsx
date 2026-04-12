@@ -12,7 +12,7 @@ export const LogosSection = () => {
           {row.map((logo, index) => (
             <span
               key={`${logo}-${index}`}
-              className="mx-6 inline-block text-lg font-semibold text-white/40 transition hover:text-white/80"
+              className="mx-6 inline-block text-lg font-semibold text-muted-foreground/40 transition hover:text-foreground/80"
             >
               {logo}
             </span>

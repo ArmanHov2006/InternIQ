@@ -11,7 +11,7 @@ import { ArrowUpRight, Bot, Mail, Sparkles, Zap } from "lucide-react";
 
 const PIPELINE_FROM_FEATURES = "/dashboard/pipeline?from=features";
 const DISCOVER_ROUTE = "/dashboard/discover";
-const DISCOVERY_SOURCES = ["Adzuna", "Greenhouse", "Himalayas", "JSearch", "Jobicy", "Jooble", "RemoteOK", "The Muse", "USAJobs"];
+const DISCOVERY_SOURCES = ["LinkedIn", "Adzuna", "Greenhouse", "Himalayas", "JSearch", "Jobicy", "Jooble", "RemoteOK", "The Muse", "USAJobs"];
 const TRACKER_PROOF_CHIPS = ["5 stages", "drag live", "AI signals"];
 
 const featureCardLinkClass =
@@ -291,8 +291,6 @@ const SmartApplyFallback = () => (
 export const FeaturesBento = () => {
   return (
     <section id="features" className="relative px-4 py-20 sm:py-28">
-      <div className="pointer-events-none absolute inset-0 opacity-[0.05] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:24px_24px]" />
-
       <div className="mx-auto max-w-7xl text-center">
         <SectionReveal>
           <span className="glass inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-sm font-medium">

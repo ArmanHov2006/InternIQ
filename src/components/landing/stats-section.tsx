@@ -44,10 +44,7 @@ const stats = [
 
 export const StatsSection = () => {
   return (
-    <section id="stats" className="relative px-4 py-20 sm:py-28">
-      {/* Background */}
-      <div className="pointer-events-none absolute inset-0 opacity-[0.06] [background-image:radial-gradient(circle_at_1px_1px,white_1px,transparent_1px)] [background-size:24px_24px]" />
-      
+    <section id="stats" className="relative overflow-hidden px-4 py-20 sm:py-28">
       {/* Section header */}
       <div className="mx-auto max-w-7xl text-center">
         <SectionReveal>

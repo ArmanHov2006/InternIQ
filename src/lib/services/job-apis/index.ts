@@ -3,6 +3,7 @@ import { fetchGreenhouseJobs } from "./greenhouse";
 import { fetchHimalayasJobs } from "./himalayas";
 import { fetchJobicyJobs } from "./jobicy";
 import { fetchJSearchJobs } from "./jsearch";
+import { fetchLinkedInJobs } from "./linkedin";
 import { fetchRemoteOKJobs } from "./remoteok";
 import { fetchJoobleJobs } from "./jooble";
 import { fetchTheMuseJobs } from "./themuse";
@@ -494,6 +495,24 @@ export async function fetchAllDiscoveryJobs(
         timeoutMs,
         runLocationAwareSource("usajobs", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
           fetchUsajobsJobs({
+            keywords: input.keywords,
+            locations,
+            roleTypes: input.roleTypes,
+            remoteQuery,
+            signal,
+          })
+        )
+      )
+    );
+  }
+
+  if (isDiscoverySourceEnabled(sourceAvailability, "linkedin")) {
+    tasks.push(
+      executeSource(
+        "linkedin",
+        timeoutMs,
+        runLocationAwareSource("linkedin", locationQuerySpecs, timeoutMs, ({ locations, remoteQuery, signal }) =>
+          fetchLinkedInJobs({
             keywords: input.keywords,
             locations,
             roleTypes: input.roleTypes,

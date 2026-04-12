@@ -17,6 +17,7 @@ const SOURCE_REGISTRY: SourceRegistryEntry[] = [
   { source: "remoteok", keyed: false, paid: false, requiresEnv: [] },
   { source: "jooble", keyed: true, paid: false, requiresEnv: ["JOOBLE_API_KEY"] },
   { source: "usajobs", keyed: true, paid: false, requiresEnv: ["USAJOBS_API_KEY", "USAJOBS_EMAIL"] },
+  { source: "linkedin", keyed: true, paid: false, requiresEnv: ["LINKEDIN_RAPIDAPI_KEY"] },
 ];
 
 export const buildDiscoverySourceAvailability = (): Record<JobApiSource, DiscoverySourceAvailability> => {

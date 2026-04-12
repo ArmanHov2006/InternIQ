@@ -148,15 +148,15 @@ export function PublicProfile({
           </header>
 
           <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <div className="rounded-xl border border-border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Projects</p>
               <p className="mt-1 text-lg font-semibold">{totalProjects}</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <div className="rounded-xl border border-border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Experience</p>
               <p className="mt-1 text-lg font-semibold">{totalExperience}</p>
             </div>
-            <div className="rounded-xl border border-white/10 bg-white/[0.02] p-3">
+            <div className="rounded-xl border border-border bg-muted/30 p-3">
               <p className="text-xs text-muted-foreground">Skills</p>
               <p className="mt-1 text-lg font-semibold">{totalSkills}</p>
             </div>

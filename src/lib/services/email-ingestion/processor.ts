@@ -80,7 +80,10 @@ const updateEventStatus = async (
   eventId: string,
   values: Record<string, unknown>
 ) => {
-  await supabaseAdmin.from("email_events").update(values).eq("id", eventId);
+  const { error } = await supabaseAdmin.from("email_events").update(values).eq("id", eventId);
+  if (error) {
+    console.error("email_event_status_update_failed", { eventId, error: error.message });
+  }
 };
 
 export const processInboundGmailMessage = async (

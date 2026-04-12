@@ -275,6 +275,7 @@ describe("discovery job api filters", () => {
       "jobicy",
       "jooble",
       "jsearch",
+      "linkedin",
       "remoteok",
       "themuse",
       "usajobs",

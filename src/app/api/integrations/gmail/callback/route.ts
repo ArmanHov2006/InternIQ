@@ -57,8 +57,11 @@ export async function GET(request: Request) {
   const tokenPayload = (await tokenResponse.json()) as {
     access_token: string;
     refresh_token?: string;
-    expires_in: number;
+    expires_in?: number;
   };
+  if (!tokenPayload.access_token) {
+    return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=oauth_exchange_failed`);
+  }
   const profileResponse = await fetch(GMAIL_PROFILE_ENDPOINT, {
     headers: { Authorization: `Bearer ${tokenPayload.access_token}` },
   });
@@ -66,7 +69,10 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${getSiteUrl()}/dashboard/settings?section=integrations&error=gmail_profile_failed`);
   }
   const profile = (await profileResponse.json()) as { emailAddress: string };
-  const expiresAt = new Date(Date.now() + tokenPayload.expires_in * 1000).toISOString();
+  const expiresInSeconds = typeof tokenPayload.expires_in === "number" && tokenPayload.expires_in > 0
+    ? tokenPayload.expires_in
+    : 3600;
+  const expiresAt = new Date(Date.now() + expiresInSeconds * 1000).toISOString();
 
   const { error: upsertError } = await supabase.from("email_connections").upsert(
     {

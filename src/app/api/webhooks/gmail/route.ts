@@ -63,6 +63,7 @@ export async function POST(request: Request) {
 
   const parsed = parsePubSubWebhookBody(body);
   if (!parsed) {
+    console.warn("gmail_webhook_malformed_body", { bodyKeys: body && typeof body === "object" ? Object.keys(body) : [] });
     return NextResponse.json({ ok: true, ignored: true });
   }
 
